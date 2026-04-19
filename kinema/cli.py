@@ -13,12 +13,29 @@ from kinema.pipeline import run_pipeline
 
 logger = logging.getLogger("kinema")
 
+_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff"}
+_AUDIO_EXTS = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".opus"}
 
-def _resolve_images(args: argparse.Namespace, workdir: Path) -> list[Path]:
+
+def _partition_inputs(paths: list[str]) -> tuple[list[Path], list[Path]]:
+    """Sort --input files into (images, audio) by extension. Unknown → image."""
+    images: list[Path] = []
+    audio: list[Path] = []
+    for raw in paths:
+        p = Path(raw)
+        ext = p.suffix.lower()
+        if ext in _AUDIO_EXTS:
+            audio.append(p)
+        else:
+            images.append(p)
+    return images, audio
+
+
+def _resolve_images(args: argparse.Namespace, workdir: Path, picked_images: list[Path]) -> list[Path]:
     if args.image_source == "picked":
-        if not args.input:
-            raise SystemExit("--input required when --image-source=picked")
-        return [Path(p) for p in args.input]
+        if not picked_images:
+            raise SystemExit("--input must include at least one image when --image-source=picked")
+        return picked_images
 
     media_types = ["image"]
     filters = json.loads(args.image_query) if args.image_query else None
@@ -36,12 +53,15 @@ def _resolve_images(args: argparse.Namespace, workdir: Path) -> list[Path]:
     return paths
 
 
-def _resolve_audio(args: argparse.Namespace, workdir: Path) -> tuple[Path, str | None]:
+def _resolve_audio(args: argparse.Namespace, workdir: Path, picked_audio: list[Path]) -> tuple[Path, str | None]:
     """Returns (path, default_title) — title used if --title not set."""
     if args.audio_source == "upload":
-        if not args.audio:
-            raise SystemExit("--audio required when --audio-source=upload")
-        return Path(args.audio), None
+        # Prefer an explicit --audio; otherwise fall back to a sniff'd --input file.
+        if args.audio:
+            return Path(args.audio), None
+        if picked_audio:
+            return picked_audio[0], None
+        raise SystemExit("--audio-source=upload needs --audio or an audio file via --input")
 
     if args.audio_source == "random_release":
         code, n, title = sources.random_release_track()
@@ -116,8 +136,9 @@ def main() -> None:
         else:
             raise SystemExit(f"recipe not found: {args.recipe}")
 
-    image_paths = _resolve_images(args, workdir)
-    audio_path, default_title = _resolve_audio(args, workdir)
+    picked_images, picked_audio = _partition_inputs(args.input or [])
+    image_paths = _resolve_images(args, workdir, picked_images)
+    audio_path, default_title = _resolve_audio(args, workdir, picked_audio)
 
     title_text = None if args.no_title else (args.title or default_title)
 
