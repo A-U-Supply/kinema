@@ -10,12 +10,13 @@ from pathlib import Path
 
 import pytest
 
-from kinema.pipeline import Recipe, _check_inputs
+from kinema.pipeline import Recipe, _build_chunk_filter, _check_inputs
 from kinema.transitions import (
     BUILDERS,
     MASK_MODES,
     GLITCH_MODES,
     XFADE_MODES,
+    TransitionSpec,
     sample_transition,
     xfade,
     mask,
@@ -103,5 +104,21 @@ def test_check_inputs_rejects_overlong_transitions() -> None:
 
 def test_check_inputs_accepts_normal_durations() -> None:
     _check_inputs(sec_per_image=1.5, transition_seconds=0.5)  # no raise
+
+
+def test_chunk_filter_normalizes_input_timebases() -> None:
+    """Regression: without this normalization, a tween mid-chain (which ends
+    in settb=AVTB) leaves the running stream with tb 1/1_000_000 while the
+    next raw mp4 input still carries the container's native tb (e.g. 1/12288
+    for 24fps). xfade rejects that mismatch."""
+    specs = [
+        TransitionSpec(builder=xfade, duration=0.5, params={"mode": "fade"}, name="xfade"),
+        TransitionSpec(builder=tween, duration=0.7, params={"fps": 30, "base": "dissolve"}, name="tween"),
+        TransitionSpec(builder=xfade, duration=0.5, params={"mode": "wipeleft"}, name="xfade"),
+    ]
+    filt = _build_chunk_filter(specs, durations=[1.5, 1.5, 1.5, 1.5])
+    # Every input stream must be normalized before any xfade consumes it.
+    for i in range(4):
+        assert f"[{i}:v]settb=AVTB,setpts=PTS-STARTPTS[v{i}]" in filt
 
 

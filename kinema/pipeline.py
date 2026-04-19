@@ -111,18 +111,18 @@ def _render_still_clip(
     _run_ffmpeg(cmd, label=f"still_clip {image.name}")
 
 
-def _render_chunk(
-    clips: list[Path], specs: list[TransitionSpec], durations: list[float], out: Path,
-) -> float:
-    """Chain `clips` with `specs` xfades in a single filter_complex.
-    `durations[i]` is the length of clip i (per-image, supports variable-length
-    beat-synced clips). Returns the chunk's total video duration."""
-    out.parent.mkdir(parents=True, exist_ok=True)
-    n = len(clips)
-    assert len(specs) == n - 1, f"need {n-1} transitions for {n} clips, got {len(specs)}"
-    assert len(durations) == n, f"need {n} durations, got {len(durations)}"
+def _build_chunk_filter(specs: list[TransitionSpec], durations: list[float]) -> str:
+    """Filter-complex for `_render_chunk`. Pulled out so it's unit-testable.
 
-    parts = [f"[{i}:v]null[v{i}]" for i in range(n)]
+    Normalizes every input's timebase to AVTB (1/1_000_000) upfront. xfade
+    rejects mismatched input timebases, and a `tween` transition mid-chain
+    rewrites the running stream's tb to AVTB via its trailing settb — so any
+    downstream xfade that pairs that stream with a fresh, not-yet-normalized
+    input would crash. Normalizing all inputs keeps tb consistent whether or
+    not a tween appears in the chain.
+    """
+    n = len(durations)
+    parts = [f"[{i}:v]settb=AVTB,setpts=PTS-STARTPTS[v{i}]" for i in range(n)]
     # Offset for xfade i is the time in the running output where image i+1's
     # transition begins — equals the cumulative duration seen so far minus the
     # transition's own duration (so the transition ends when clip i would have).
@@ -135,8 +135,21 @@ def _render_chunk(
         prev = next_label
     if n == 1:
         parts.append("[v0]null[vout]")
+    return ";".join(parts)
 
-    filter_complex = ";".join(parts)
+
+def _render_chunk(
+    clips: list[Path], specs: list[TransitionSpec], durations: list[float], out: Path,
+) -> float:
+    """Chain `clips` with `specs` xfades in a single filter_complex.
+    `durations[i]` is the length of clip i (per-image, supports variable-length
+    beat-synced clips). Returns the chunk's total video duration."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    n = len(clips)
+    assert len(specs) == n - 1, f"need {n-1} transitions for {n} clips, got {len(specs)}"
+    assert len(durations) == n, f"need {n} durations, got {len(durations)}"
+
+    filter_complex = _build_chunk_filter(specs, durations)
     cmd = ["ffmpeg", "-y", "-loglevel", "error"]
     for c in clips:
         cmd += ["-i", str(c)]
