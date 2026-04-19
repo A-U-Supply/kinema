@@ -19,9 +19,9 @@ from kinema.vendor.protease.block_letter_bot import render_block_word
 logger = logging.getLogger(__name__)
 
 ASPECT_DIMS = {
-    "16:9": (1920, 1080),
-    "9:16": (1080, 1920),
-    "1:1": (1080, 1080),
+    "16:9": (1280, 720),
+    "9:16": (720, 1280),
+    "1:1": (720, 720),
 }
 
 _FALLBACK_FONTS = [

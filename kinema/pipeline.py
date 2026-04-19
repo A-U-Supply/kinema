@@ -76,17 +76,56 @@ def _render_still_clip(image: Path, duration: float, width: int, height: int, ou
     vf = (
         f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
-        f"setsar=1,format=yuv420p,fps=30"
+        f"setsar=1,format=yuv420p,fps=24"
     )
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
         "-loop", "1", "-t", f"{duration:.3f}", "-i", str(image),
         "-vf", vf,
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24",
         "-pix_fmt", "yuv420p",
         str(out),
     ]
     _run_ffmpeg(cmd, label=f"still_clip {image.name}")
+
+
+def _render_chunk(
+    clips: list[Path], specs: list[TransitionSpec], sec_per_image: float, out: Path,
+) -> float:
+    """Chain `clips` with `specs` xfades in a single filter_complex.
+    Returns the chunk's video duration."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    n = len(clips)
+    assert len(specs) == n - 1, f"need {n-1} transitions for {n} clips, got {len(specs)}"
+
+    # Build inputs and filter graph. Each clip is already normalized; just
+    # alias [{i}:v] → [v{i}] so the xfade chain is uniform.
+    parts = [f"[{i}:v]null[v{i}]" for i in range(n)]
+    cumulative_offset = 0.0
+    prev = "v0"
+    for i, spec in enumerate(specs):
+        cumulative_offset += sec_per_image - spec.duration
+        next_label = f"x{i+1}" if i < n - 2 else "vout"
+        parts.append(f"{spec.filter_str(prev, f'v{i+1}', cumulative_offset)}[{next_label}]")
+        prev = next_label
+    if n == 1:
+        parts.append("[v0]null[vout]")
+
+    filter_complex = ";".join(parts)
+    cmd = ["ffmpeg", "-y", "-loglevel", "error"]
+    for c in clips:
+        cmd += ["-i", str(c)]
+    cmd += [
+        "-filter_complex", filter_complex,
+        "-map", "[vout]",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        str(out),
+    ]
+    _run_ffmpeg(cmd, label=f"chunk {out.name} ({n} clips)")
+
+    # Chunk duration = sum(sec_per_image) - sum(transition_durations)
+    return sec_per_image * n - sum(s.duration for s in specs)
 
 
 def _xfade_pair(
@@ -100,7 +139,7 @@ def _xfade_pair(
         "-i", str(accum), "-i", str(clip),
         "-filter_complex", f"{filt}[vout]",
         "-map", "[vout]",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24",
         "-pix_fmt", "yuv420p",
         str(out),
     ]
@@ -180,39 +219,55 @@ def run_pipeline(
         recipe.name, len(inputs), audio_seconds, aspect, sec_per_image, plan_T,
     )
 
-    # 1) Render each image as a fixed-length clip.
+    # 1) Render each input image into a still mp4 clip.
     clips_dir = workdir / "clips"
     clips: list[Path] = []
     for i, img in enumerate(inputs):
         clip = clips_dir / f"clip_{i:04d}.mp4"
         _render_still_clip(img, sec_per_image, width, height, clip)
         clips.append(clip)
-        if i % 20 == 0:
+        if (i + 1) % 20 == 0:
             logger.info("clips rendered: %d/%d", i + 1, len(inputs))
 
-    # 2) Chain xfades pairwise — accumulator grows by (D - T) per step.
-    accum = clips[0]
-    accum_duration = sec_per_image
+    # 2) Chunked xfade chaining: render CHUNK_SIZE clips at a time in one
+    # filter_complex (small N, OK for memory), then chain the chunk videos
+    # pairwise. Drastically fewer ffmpeg invocations than pure pairwise.
+    CHUNK_SIZE = 6
+    chunks: list[tuple[Path, float]] = []  # (path, duration)
+    chunk_dir = workdir / "chunks"
+    for ci in range(0, len(clips), CHUNK_SIZE):
+        group = clips[ci : ci + CHUNK_SIZE]
+        chunk_path = chunk_dir / f"chunk_{ci // CHUNK_SIZE:04d}.mp4"
+        if len(group) == 1:
+            shutil.copy2(group[0], chunk_path)
+            chunk_dur = sec_per_image
+        else:
+            chunk_specs = [sample_transition(recipe.transitions, rng) for _ in range(len(group) - 1)]
+            chunk_dur = _render_chunk(group, chunk_specs, sec_per_image, chunk_path)
+        chunks.append((chunk_path, chunk_dur))
+        logger.info("chunk %d/%d → %.1fs", ci // CHUNK_SIZE + 1, (len(clips) + CHUNK_SIZE - 1) // CHUNK_SIZE, chunk_dur)
+
+    # 3) Chain chunks pairwise with one xfade between each adjacent pair.
+    accum, accum_duration = chunks[0]
     accum_dir = workdir / "accum"
-    for i in range(1, len(clips)):
+    for i in range(1, len(chunks)):
+        next_clip, next_dur = chunks[i]
         spec = sample_transition(recipe.transitions, rng)
         offset = max(0.0, accum_duration - spec.duration)
         next_accum = accum_dir / f"accum_{i:04d}.mp4"
-        _xfade_pair(accum, clips[i], spec, offset, next_accum)
-        # Free space: drop the previous accumulator (clips kept for debugging).
-        if accum != clips[0]:
+        _xfade_pair(accum, next_clip, spec, offset, next_accum)
+        if accum != chunks[0][0]:
             try: accum.unlink()
             except OSError: pass
         accum = next_accum
-        accum_duration = accum_duration + sec_per_image - spec.duration
-        if i % 10 == 0:
-            logger.info("xfades: %d/%d (accum %.1fs)", i, len(clips) - 1, accum_duration)
+        accum_duration = accum_duration + next_dur - spec.duration
+        logger.info("inter-chunk xfade %d/%d (accum %.1fs)", i, len(chunks) - 1, accum_duration)
 
-    # 3) Mux audio.
+    # 4) Mux audio.
     _mux_audio(accum, audio_path, out_path)
 
     # Cleanup intermediates.
-    for p in (workdir / "clips", workdir / "accum"):
+    for p in (workdir / "clips", workdir / "chunks", workdir / "accum"):
         shutil.rmtree(p, ignore_errors=True)
 
     return out_path
