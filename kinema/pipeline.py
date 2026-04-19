@@ -52,22 +52,15 @@ def _ffprobe_duration(path: Path) -> float:
     return float(json.loads(out)["format"]["duration"])
 
 
-def _decide_image_count(audio_seconds: float, sec_per_image: float, transition_seconds: float) -> int:
-    """Total render = N*D - (N-1)*T. Solve N for target ≈ audio_seconds, +1 for buffer."""
+# Hard cap to keep the filter_complex graph + decoder allocations within the
+# worker's 4GB / 2-CPU envelope. Real-world: 117 simultaneous image inputs
+# OOM-killed ffmpeg silently. ~40 has comfortable headroom.
+_MAX_IMAGES_IN_GRAPH = 40
+
+
+def _check_inputs(sec_per_image: float, transition_seconds: float) -> None:
     if sec_per_image <= transition_seconds:
         raise ValueError("sec_per_image must exceed transition duration")
-    n = math.ceil((audio_seconds + transition_seconds) / (sec_per_image - transition_seconds)) + 1
-    return max(2, n)
-
-
-def _cycle_to_length(items: list[Path], n: int) -> list[Path]:
-    """Repeat the input list (in order) until length n, never empty."""
-    if not items:
-        raise ValueError("no images provided")
-    out = []
-    while len(out) < n:
-        out.extend(items)
-    return out[:n]
 
 
 def _build_filter_graph(
@@ -142,14 +135,25 @@ def run_pipeline(
         inputs = [title_png, *inputs]
 
     audio_seconds = _ffprobe_duration(audio_path)
-    # Use the recipe's first transition duration as the planning baseline.
     plan_T = float((recipe.transitions[0].get("params") or {}).get("duration", 0.5))
-    n = _decide_image_count(audio_seconds, sec_per_image, plan_T)
-    images = _cycle_to_length(inputs, n)
+    _check_inputs(sec_per_image, plan_T)
 
+    # Use exactly what was provided; cap for ffmpeg sanity. The user controls
+    # video length via image_count (or by picking more images). Audio is
+    # trimmed/clipped to whichever side ends first via -shortest.
+    if len(inputs) > _MAX_IMAGES_IN_GRAPH:
+        logger.warning("trimming %d images to %d to fit ffmpeg envelope",
+                       len(inputs), _MAX_IMAGES_IN_GRAPH)
+        images = inputs[:_MAX_IMAGES_IN_GRAPH]
+    else:
+        images = inputs
+    if len(images) < 2:
+        raise ValueError(f"need at least 2 images, got {len(images)}")
+
+    video_seconds = len(images) * sec_per_image - (len(images) - 1) * plan_T
     logger.info(
-        "rendering: recipe=%s images=%d audio=%.1fs aspect=%s sec/image=%.2f",
-        recipe.name, len(images), audio_seconds, aspect, sec_per_image,
+        "rendering: recipe=%s images=%d → %.1fs video, %.1fs audio, aspect=%s",
+        recipe.name, len(images), video_seconds, audio_seconds, aspect,
     )
 
     cmd: list[str] = ["ffmpeg", "-y", "-loglevel", "error"]

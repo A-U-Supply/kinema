@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from kinema.pipeline import Recipe, _build_filter_graph, _decide_image_count, _cycle_to_length
+from kinema.pipeline import Recipe, _build_filter_graph, _check_inputs
 from kinema.transitions import (
     BUILDERS,
     MASK_MODES,
@@ -98,21 +98,13 @@ def test_shipped_recipes_load_and_sample(name: str, path: Path) -> None:
     assert spec.name in BUILDERS
 
 
-def test_decide_image_count_matches_audio_length() -> None:
-    # 60s audio, 1.5s/image, 0.5s transitions → ~60 images, ±a couple for buffer
-    n = _decide_image_count(audio_seconds=60.0, sec_per_image=1.5, transition_seconds=0.5)
-    assert 58 <= n <= 65
-
-
-def test_decide_image_count_rejects_overlong_transitions() -> None:
+def test_check_inputs_rejects_overlong_transitions() -> None:
     with pytest.raises(ValueError, match="must exceed"):
-        _decide_image_count(audio_seconds=60.0, sec_per_image=0.5, transition_seconds=0.5)
+        _check_inputs(sec_per_image=0.5, transition_seconds=0.5)
 
 
-def test_cycle_to_length_repeats_and_truncates() -> None:
-    items = [Path("a"), Path("b"), Path("c")]
-    assert _cycle_to_length(items, 7) == [Path(p) for p in "abcabca"]
-    assert _cycle_to_length(items, 2) == [Path("a"), Path("b")]
+def test_check_inputs_accepts_normal_durations() -> None:
+    _check_inputs(sec_per_image=1.5, transition_seconds=0.5)  # no raise
 
 
 def test_build_filter_graph_has_correct_offsets_and_labels() -> None:
