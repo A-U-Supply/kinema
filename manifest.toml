@@ -58,7 +58,7 @@ flag = "--image-count"
 [params.audio_source]
 type = "select"
 label = "Audio Source"
-options = ["random_release", "pick_release", "search", "upload"]
+options = ["random_release", "pick_track", "search", "upload"]
 default = "random_release"
 required = true
 flag = "--audio-source"
@@ -70,21 +70,17 @@ default = ""
 flag = "--audio-query"
 depends_on = { param = "audio_source", value = "search" }
 
-[params.release_code]
-type = "string"
-label = "Release Code"
+# The `track` dropdown is populated dynamically by scripts/register.py from
+# the live release catalog. Options here are a placeholder — re-run the
+# registrar whenever releases change.
+[params.track]
+type = "select"
+label = "Track"
+description = "Pick a specific release + track"
 default = ""
-flag = "--release-code"
-depends_on = { param = "audio_source", value = "pick_release" }
-
-[params.release_track]
-type = "int"
-label = "Track Number"
-min = 1
-max = 99
-default = 1
-flag = "--release-track"
-depends_on = { param = "audio_source", value = "pick_release" }
+options = [""]
+flag = "--track"
+depends_on = { param = "audio_source", value = "pick_track" }
 
 [params.recipe]
 type = "select"

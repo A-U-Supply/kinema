@@ -127,6 +127,18 @@ def find_track_stream_url(code: str, track_number: int) -> tuple[str, str]:
     raise RuntimeError(f"release {code} has no track number {track_number}")
 
 
+def track_url_by_id(code: str, track_id: str) -> tuple[str, str]:
+    """Return (absolute_stream_url, title) for a track id (the dropdown payload)."""
+    detail = get_release(code)
+    for t in detail.get("tracks", []):
+        if str(t.get("id")) == str(track_id):
+            url = t.get("stream_url")
+            if not url:
+                raise RuntimeError(f"track {track_id} of {code} has no stream_url")
+            return _absolutize(url), t.get("title", "")
+    raise RuntimeError(f"release {code} has no track id {track_id}")
+
+
 def random_release_track() -> tuple[str, str]:
     """Pick any track from any published release. Returns (absolute_stream_url, title)."""
     releases = list_releases()

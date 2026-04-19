@@ -77,6 +77,15 @@ def _resolve_audio(args: argparse.Namespace, workdir: Path, picked_audio: list[P
         sources.download(url, dest)
         return dest, title
 
+    if args.audio_source == "pick_track":
+        if not args.track or "|" not in args.track:
+            raise SystemExit('--track required, format "RELEASE_CODE|TRACK_ID"')
+        code, raw_id = args.track.split("|", 1)
+        url, title = sources.track_url_by_id(code, raw_id)
+        dest = workdir / "audio" / "track.mp3"
+        sources.download(url, dest)
+        return dest, title
+
     if args.audio_source == "search":
         filters = json.loads(args.audio_query) if args.audio_query else None
         hits = sources.search_media(media_types=["audio"], filters=filters, per_page=10)
@@ -108,6 +117,7 @@ def main() -> None:
     p.add_argument("--audio-query", help="JSON filter object for search index")
     p.add_argument("--release-code")
     p.add_argument("--release-track", type=int)
+    p.add_argument("--track", help='dropdown value: "RELEASE_CODE|TRACK_ID" — used when --audio-source=pick_track')
     p.add_argument("--recipe", default="hybrid-wash", help="recipe name (resolved against /app/recipes/) or path")
     p.add_argument("--aspect", choices=["16:9", "9:16", "1:1"], default="16:9")
     p.add_argument("--sec-per-image", type=float, default=1.5)
