@@ -35,30 +35,45 @@ class MediaHit:
     duration_seconds: float | None = None
 
 
+# Server caps per_page at 100; we paginate if the caller wants more.
+_API_PER_PAGE_CAP = 100
+
+
 def search_media(
     media_types: list[str],
     filters: dict[str, Any] | None = None,
     query: str | None = None,
-    page: int = 1,
     per_page: int = 100,
     sort: str = "created_at:desc",
 ) -> list[MediaHit]:
-    """POST /api/search — returns hits matching filter spec."""
-    payload: dict[str, Any] = {
-        "media_types": media_types,
-        "page": page,
-        "per_page": per_page,
-        "sort": sort,
-    }
-    if filters:
-        payload["filters"] = filters
-    if query:
-        payload["query"] = query
+    """POST /api/search — returns up to `per_page` hits, paginating if needed."""
+    want = max(1, per_page)
+    out: list[MediaHit] = []
+    page = 1
+    while len(out) < want:
+        chunk = min(_API_PER_PAGE_CAP, want - len(out))
+        payload: dict[str, Any] = {
+            "media_types": media_types,
+            "page": page,
+            "per_page": chunk,
+            "sort": sort,
+        }
+        if filters:
+            payload["filters"] = filters
+        if query:
+            payload["query"] = query
 
-    r = requests.post(f"{_base_url()}/api/search", json=payload, headers=_headers(), timeout=30)
-    r.raise_for_status()
-    data = r.json()
-    return [_hit_from_search(h) for h in data.get("hits", [])]
+        r = requests.post(f"{_base_url()}/api/search", json=payload, headers=_headers(), timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        hits = [_hit_from_search(h) for h in data.get("hits", [])]
+        if not hits:
+            break
+        out.extend(hits)
+        if len(hits) < chunk:
+            break  # exhausted
+        page += 1
+    return out[:want]
 
 
 def _hit_from_search(h: dict[str, Any]) -> MediaHit:
