@@ -95,35 +95,36 @@ def get_release(code: str) -> dict[str, Any]:
     return r.json()
 
 
-def stream_track_url(code: str, track_id: str) -> str:
-    """The catalog route uses the track's UUID `id`, not its `track_number`."""
-    return f"{_base_url()}/api/releases/{quote(code, safe='')}/tracks/{track_id}/stream"
+def _absolutize(url: str) -> str:
+    """Release/track API responses include relative stream_urls; we need absolute."""
+    return url if url.startswith("http") else f"{_base_url()}{url}"
 
 
-def find_track_id(code: str, track_number: int) -> str:
-    """Translate a 1-based track number to its UUID id by walking the release detail."""
+def find_track_stream_url(code: str, track_number: int) -> tuple[str, str]:
+    """Return (absolute_stream_url, title) for a 1-based track number in a release."""
     detail = get_release(code)
     for t in detail.get("tracks", []):
         if int(t.get("track_number", -1)) == int(track_number):
-            return t["id"]
+            url = t.get("stream_url")
+            if not url:
+                raise RuntimeError(f"track {track_number} of {code} has no stream_url")
+            return _absolutize(url), t.get("title", "")
     raise RuntimeError(f"release {code} has no track number {track_number}")
 
 
-def random_release_track() -> tuple[str, str, str]:
-    """Pick any track from any published release. Returns (code, track_id, title)."""
+def random_release_track() -> tuple[str, str]:
+    """Pick any track from any published release. Returns (absolute_stream_url, title)."""
     releases = list_releases()
     if not releases:
         raise RuntimeError("no published releases available")
-    # Prefer a release with at least one track (a few catalog entries are
-    # placeholders / vinyl-only with no audio).
     random.shuffle(releases)
     for rel in releases:
         detail = get_release(rel["product_code"])
-        tracks = [t for t in detail.get("tracks", []) if t.get("audio_file_path")]
+        tracks = [t for t in detail.get("tracks", []) if t.get("stream_url")]
         if not tracks:
             continue
         track = random.choice(tracks)
-        return rel["product_code"], track["id"], track.get("title", "")
+        return _absolutize(track["stream_url"]), track.get("title", "")
     raise RuntimeError("no published releases have streamable tracks")
 
 
