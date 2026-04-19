@@ -1,12 +1,11 @@
 name: Smooth Fade
 description: >
-  Gentle cross-dissolves between every image. The default — pure xfade
-  with no embellishment. Use as a baseline to verify the pipeline is
-  working before reaching for anything wilder.
+  Slow, gentle cross-dissolves. The default — pure xfade with no
+  embellishment. Sleepy, hypnotic. Use as a baseline.
 
 transitions:
   - type: xfade
     weight: 1.0
     params:
       mode: fade
-      duration: 0.5
+      duration: 0.8

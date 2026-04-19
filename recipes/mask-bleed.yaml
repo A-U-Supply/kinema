@@ -1,12 +1,40 @@
 name: Mask Bleed
 description: >
-  Each cut a different shape pulled from the mask pool — wipes, slices,
-  circles, opens. The video reads as a sequence of unmaskings rather than
-  a sequence of dissolves.
+  Every cut a different shape — long slow wipes, sliding panels, opening
+  irises. Each transition is unmistakably directional. Reads as a
+  sequence of unmaskings rather than a sequence of dissolves.
 
 transitions:
-  - type: mask
+  - type: xfade
     weight: 1.0
-    params:
-      mode: random
-      duration: 0.6
+    params: { mode: wipeleft,    duration: 1.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: wiperight,   duration: 1.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: wipeup,      duration: 1.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: wipedown,    duration: 1.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: circleopen,  duration: 1.4 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: circleclose, duration: 1.4 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: rectcrop,    duration: 1.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: vertopen,    duration: 1.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: horzopen,    duration: 1.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: diagtl,      duration: 1.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: diagtr,      duration: 1.0 }
