@@ -198,14 +198,25 @@ def run_pipeline(
         raise ValueError(f"need at least 2 images (incl. title card), got {len(inputs)}")
 
     audio_seconds = _ffprobe_duration(audio_path)
-    # Use the recipe's mean transition duration as the planning baseline.
+    # Use the recipe's mean transition duration as the planning baseline, and
+    # the MAX as the floor for sec_per_image — a recipe with 2.5s transitions
+    # can't use a 1.5s/image default.
     durs = [float((t.get("params") or {}).get("duration", 0.5)) for t in recipe.transitions]
     plan_T = sum(durs) / max(1, len(durs))
-    _check_inputs(sec_per_image, plan_T)
+    max_T = max(durs) if durs else 0.5
+    if sec_per_image <= max_T:
+        # Auto-bump rather than erroring. Keeps slow-burn etc. usable with defaults.
+        sec_per_image = max_T + 0.5
+        logger.info("bumped sec_per_image → %.2fs to exceed recipe's longest transition (%.2fs)",
+                    sec_per_image, max_T)
 
-    # Cycle inputs to fill the audio length so the whole track plays.
-    # Pairwise rendering keeps memory bounded so this is safe even at N=200+.
-    target_images = max(2, int((audio_seconds + plan_T) / max(0.01, sec_per_image - plan_T)) + 1)
+    # Cap cycled image count — a recipe where transition duration ≈ sec_per_image
+    # mathematically asks for thousands of clips, which destroys render time and
+    # disk use. 120 images at 1.5s/each gives a ~3-minute video; anything longer
+    # than that gets -shortest'd against the audio.
+    per_image_net = max(0.1, sec_per_image - plan_T)
+    target_images = max(2, int(audio_seconds / per_image_net) + 1)
+    target_images = min(target_images, 120)
     if len(inputs) < target_images:
         cycled: list[Path] = []
         i = 0

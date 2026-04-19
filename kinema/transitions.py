@@ -74,10 +74,13 @@ def xfade(a: str, b: str, duration: float, offset: float, *, mode: str = "fade")
 
 def tween(a: str, b: str, duration: float, offset: float, *, fps: int = 30, base: str = "fade") -> str:
     """Motion-compensated tween via minterpolate. CPU-heavy; v1 may swap in
-    RIFE/FILM via Modal."""
+    RIFE/FILM via Modal. Pin fps + timebase at the tail so it's concatenable
+    with other xfades (minterpolate rewrites timebase to 1/fps*N, which
+    crashes subsequent xfade steps expecting 1/fps)."""
     return (
         f"[{a}][{b}]xfade=transition={base}:duration={duration:.3f}:offset={offset:.3f},"
-        f"minterpolate=fps={fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir"
+        f"minterpolate=fps={fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir,"
+        f"fps={fps},settb=AVTB,setpts=PTS-STARTPTS"
     )
 
 
