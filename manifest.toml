@@ -12,7 +12,7 @@ no two passes look identical.
 """
 image = "ghcr.io/a-u-supply/kinema:latest"
 command = "--output /work/output/kinema.mp4"
-timeout_seconds = 1800
+timeout_seconds = 86400  # effectively none — 24h
 
 [input]
 media_types = ["image", "audio"]
@@ -32,9 +32,9 @@ input_flag = "--input"
 [params.image_source]
 type = "select"
 label = "Image Source"
-description = "Where do the images come from?"
-options = ["picked", "search", "random"]
-default = "picked"
+description = "Where do the images come from? random = a fresh sample from the full corpus on every render."
+options = ["random", "search", "picked"]
+default = "random"
 required = true
 flag = "--image-source"
 

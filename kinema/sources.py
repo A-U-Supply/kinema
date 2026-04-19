@@ -37,6 +37,45 @@ class MediaHit:
 
 # Server caps per_page at 100; we paginate if the caller wants more.
 _API_PER_PAGE_CAP = 100
+# /api/media/random is capped at 50 items per call.
+_RANDOM_PER_CALL_CAP = 50
+
+
+def random_media(count: int, media_types: list[str]) -> list[MediaHit]:
+    """GET /api/media/random — truly random items, paginated with exclude_ids
+    so we don't get duplicates across calls."""
+    want = max(1, count)
+    out: list[MediaHit] = []
+    seen_ids: set[str] = set()
+    while len(out) < want:
+        chunk = min(_RANDOM_PER_CALL_CAP, want - len(out))
+        params = {
+            "count": chunk,
+            "media_types": ",".join(media_types),
+        }
+        if seen_ids:
+            params["exclude_ids"] = ",".join(seen_ids)
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+        r = requests.get(
+            f"{_base_url()}/api/media/random?{qs}", headers=_headers(), timeout=30,
+        )
+        r.raise_for_status()
+        data = r.json()
+        items = data.get("items") or data.get("hits") or data
+        if isinstance(items, dict):
+            items = items.get("items", [])
+        if not items:
+            break
+        before = len(out)
+        for item in items:
+            mid = item.get("id")
+            if not mid or mid in seen_ids:
+                continue
+            seen_ids.add(mid)
+            out.append(_hit_from_search(item))
+        if len(out) == before:
+            break  # API stopped returning new items
+    return out[:want]
 
 
 def search_media(

@@ -37,13 +37,17 @@ def _resolve_images(args: argparse.Namespace, workdir: Path, picked_images: list
             raise SystemExit("--input must include at least one image when --image-source=picked")
         return picked_images
 
-    media_types = ["image"]
-    filters = json.loads(args.image_query) if args.image_query else None
-    hits = sources.search_media(
-        media_types=media_types, filters=filters, per_page=args.image_count
-    )
+    # Random = genuinely random across the whole corpus (via /api/media/random).
+    # Search = ordered search using the caller's JSON filter.
+    if args.image_source == "random":
+        hits = sources.random_media(count=args.image_count, media_types=["image"])
+    else:
+        filters = json.loads(args.image_query) if args.image_query else None
+        hits = sources.search_media(
+            media_types=["image"], filters=filters, per_page=args.image_count
+        )
     if not hits:
-        raise SystemExit("image search returned no results")
+        raise SystemExit(f"no images found for image_source={args.image_source}")
 
     paths: list[Path] = []
     for hit in hits[: args.image_count]:
@@ -105,7 +109,7 @@ def main() -> None:
     # omits a flag whenever the param value equals the manifest default, so the
     # CLI must reach the same value via argparse defaults.
     p.add_argument("--input", nargs="*", help="image and/or audio paths (worker mounts /work/input/)")
-    p.add_argument("--image-source", choices=["picked", "search", "random"], default="picked")
+    p.add_argument("--image-source", choices=["picked", "search", "random"], default="random")
     p.add_argument("--image-query", help="JSON filter object for search index")
     p.add_argument("--image-count", type=int, default=120)
     p.add_argument("--audio", help="audio path (used when --audio-source=upload)")
