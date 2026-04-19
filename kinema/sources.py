@@ -206,6 +206,17 @@ def download(url: str, dest: Path) -> Path:
     return dest
 
 
+def download_optional(url: str, dest: Path) -> Path | None:
+    """Download, but swallow 4xx/5xx errors and return None. Used when one bad
+    media item shouldn't crash the whole job."""
+    try:
+        return download(url, dest)
+    except requests.HTTPError as e:
+        import logging
+        logging.getLogger(__name__).warning("skipping %s: %s", url, e)
+        return None
+
+
 _SONG_TITLES_URL = (
     "https://raw.githubusercontent.com/A-U-Supply/ausupply.github.io/"
     "master/song-titles-bot/titles.json"

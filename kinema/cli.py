@@ -52,8 +52,11 @@ def _resolve_images(args: argparse.Namespace, workdir: Path, picked_images: list
     paths: list[Path] = []
     for hit in hits[: args.image_count]:
         dest = workdir / "images" / hit.filename
-        sources.download(hit.download_url, dest)
-        paths.append(dest)
+        got = sources.download_optional(hit.download_url, dest)
+        if got is not None:
+            paths.append(got)
+    if not paths:
+        raise SystemExit("every image download failed")
     return paths
 
 

@@ -84,7 +84,6 @@ def _render_still_clip(
     `effect` is an ffmpeg vf chain applied BEFORE the scale+pad (so the
     effect runs on the full-res source)."""
     out.parent.mkdir(parents=True, exist_ok=True)
-    # Effect first (on full-res source), then normalize.
     effect_chain = f"{effect}," if effect and effect != "null" else ""
     vf = (
         f"{effect_chain}"
@@ -92,12 +91,21 @@ def _render_still_clip(
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
         f"setsar=1,format=yuv420p,fps=24"
     )
+    # GIFs use a different demuxer that doesn't accept `-loop 1` as a global
+    # option. Use `-stream_loop -1` instead for animated formats — with
+    # `-t duration`, the output stops at the requested length regardless.
+    ext = image.suffix.lower()
+    if ext in (".gif", ".webp", ".apng"):
+        input_opts = ["-stream_loop", "-1", "-t", f"{duration:.3f}", "-i", str(image)]
+    else:
+        input_opts = ["-loop", "1", "-t", f"{duration:.3f}", "-i", str(image)]
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
-        "-loop", "1", "-t", f"{duration:.3f}", "-i", str(image),
+        *input_opts,
         "-vf", vf,
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24",
         "-pix_fmt", "yuv420p",
+        "-t", f"{duration:.3f}",
         str(out),
     ]
     _run_ffmpeg(cmd, label=f"still_clip {image.name}")

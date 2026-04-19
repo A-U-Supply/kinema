@@ -28,11 +28,15 @@ def detect_beats(audio_path: Path, *, skip: int = 1) -> list[float]:
     # detection meaningfully and slows load 2x.
     y, sr = librosa.load(str(audio_path), sr=22050, mono=True)
     tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr, units="time")
-    beats: list[float] = list(map(float, beat_frames))
+    beats: list[float] = [float(b) for b in beat_frames]
     if skip > 1:
         beats = beats[::skip]
-    logger.info("detected %d beats (tempo ~%.1f BPM, skip=%d)",
-                len(beats), float(tempo) if hasattr(tempo, "__float__") else tempo, skip)
+    # tempo is a numpy array in newer librosa — coerce to scalar safely.
+    try:
+        tempo_val = float(tempo.item() if hasattr(tempo, "item") else tempo)
+    except (TypeError, ValueError):
+        tempo_val = 0.0
+    logger.info("detected %d beats (tempo ~%.1f BPM, skip=%d)", len(beats), tempo_val, skip)
     return beats
 
 
