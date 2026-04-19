@@ -57,7 +57,7 @@ def main() -> int:
                 "image_count": 40,
                 "audio_source": "random_release",
                 "recipe": recipe,
-                "title_card": "none",
+                "title_card": "track_title",
                 "sec_per_image": 1.5,
             },
         }

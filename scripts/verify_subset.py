@@ -50,7 +50,7 @@ def _submit(recipe):
         "params": {
             "image_source": "random", "image_count": 40,
             "audio_source": "random_release",
-            "recipe": recipe, "title_card": "none",
+            "recipe": recipe, "title_card": "track_title",
             "sec_per_image": 1.5,
         },
     }
