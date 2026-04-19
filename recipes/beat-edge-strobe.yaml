@@ -1,0 +1,20 @@
+name: Beat Edge Strobe
+description: >
+  Beat-synced fast cuts, alternating between edge-detect and full image.
+  The eye keeps swapping between "what it is" and "the outline of what
+  it is" on every beat. Electric.
+
+beat_sync: true
+beat_skip: 1
+
+clip_effects:
+  - every: 2
+    effect: edges_hard
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: fadeblack, duration: 0.10 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: pixelize, duration: 0.12 }

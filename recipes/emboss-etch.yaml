@@ -1,0 +1,16 @@
+name: Emboss Etch
+description: >
+  Every clip embossed — gray relief that looks like pressed metal or
+  etched glass. Long fades let the reliefs blend into each other.
+
+clip_effects:
+  - every: 1
+    effect: emboss
+
+transitions:
+  - type: xfade
+    weight: 2.0
+    params: { mode: fade, duration: 1.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: radial, duration: 1.0 }

@@ -87,14 +87,26 @@ type = "select"
 label = "Transition Recipe"
 description = "Which transition pool to sample from. mask-* and *-only recipes focus on a single transition family; hybrid-wash and chaos-shuffle mix everything."
 options = [
+  # Gentle / ambient
   "smooth-fade", "soft-bloom", "slow-burn",
+  # Mask families
   "mask-bleed", "all-mask-random",
   "iris-only", "side-wipes", "vertical-pulse", "diagonal-sweep",
   "slice-storm", "squeeze-snap", "focus-pull",
-  "film-leader", "tape-decay",
-  "glitch-cut", "rapid-fire",
+  # Film / analog feel
+  "film-leader", "tape-decay", "emboss-etch", "sepia-ghost",
+  # Glitch / abrasive
+  "glitch-cut", "rapid-fire", "pixelate-decay",
+  # Color / channel experiments
+  "rgb-split", "hue-drift", "solarize-wash", "chroma-glow",
+  # Inverted / negative effects
+  "invert-pulse", "edge-only", "edge-flash", "threshold-punch",
+  # Hybrids
   "hybrid-wash", "chaos-shuffle",
+  # Beat-synced
   "beat-sync-fast", "beat-sync-half", "beat-drop",
+  "beat-invert", "beat-strobe", "beat-edge-strobe",
+  "beat-mask-flip", "posterize-beat",
 ]
 default = "hybrid-wash"
 required = true

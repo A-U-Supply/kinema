@@ -1,0 +1,24 @@
+name: Chroma Glow
+description: >
+  Heavy saturation + chromatic-aberration-style RGB split, long smooth
+  masked reveals. Glowing, over-colored, analog.
+
+clip_effects:
+  - every: 1
+    effect: vibrance
+  - every: 4
+    effect: chromashift
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: circleopen, duration: 1.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: radial, duration: 1.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: smoothleft, duration: 1.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: smoothright, duration: 1.0 }

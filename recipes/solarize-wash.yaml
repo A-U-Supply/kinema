@@ -1,0 +1,16 @@
+name: Solarize Wash
+description: >
+  Darkroom solarization — bright values inverted, dark values left
+  alone. Reads like overexposed film. Long fades between.
+
+clip_effects:
+  - every: 1
+    effect: solarize
+
+transitions:
+  - type: xfade
+    weight: 2.0
+    params: { mode: fade, duration: 0.9 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: radial, duration: 1.0 }

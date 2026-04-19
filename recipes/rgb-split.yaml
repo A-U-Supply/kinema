@@ -1,0 +1,24 @@
+name: RGB Split
+description: >
+  Every image cycled through mono-red, mono-green, mono-blue
+  channel-isolation. Slow mask transitions let each color bleed into
+  the next. Reads like a color separation gone wrong.
+
+clip_effects:
+  - every: 3
+    offset: 0
+    effect: mono_red
+  - every: 3
+    offset: 1
+    effect: mono_green
+  - every: 3
+    offset: 2
+    effect: mono_blue
+
+transitions:
+  - type: xfade
+    weight: 2.0
+    params: { mode: fade, duration: 0.8 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: dissolve, duration: 0.8 }

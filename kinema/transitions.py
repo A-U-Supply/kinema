@@ -101,6 +101,55 @@ BUILDERS: dict[str, Callable] = {
     "tween": tween,
 }
 
+
+# Per-clip visual effects — applied during still_clip render BEFORE transitions.
+# Each value is an ffmpeg video-filter chain snippet that transforms a single
+# video stream. The pipeline prepends it to the scale+pad chain.
+CLIP_EFFECTS: dict[str, str] = {
+    "none": "null",
+    "negate": "negate",
+    "edges": "edgedetect=mode=colormix:high=0.2",
+    "edges_hard": "edgedetect=mode=canny:low=0.1:high=0.4",
+    "threshold": (
+        "lutyuv='y=if(gt(val,128),255,0)':u=128:v=128"
+    ),
+    "posterize": "lutyuv='y=(floor(val/32))*32':u='(floor(val/32))*32':v='(floor(val/32))*32'",
+    "hue_shift": "hue=h=180",
+    "hue_drift": "hue=h='mod(t*60,360)'",  # rotate 60°/sec
+    "saturate": "eq=saturation=2.0",
+    "desaturate": "hue=s=0",
+    "mono_red": "lutrgb=r='val':g=0:b=0",
+    "mono_green": "lutrgb=r=0:g='val':b=0",
+    "mono_blue": "lutrgb=r=0:g=0:b='val'",
+    "sepia": "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131",
+    "emboss": "convolution='-2 -1 0 -1 1 1 0 1 2:-2 -1 0 -1 1 1 0 1 2:-2 -1 0 -1 1 1 0 1 2:-2 -1 0 -1 1 1 0 1 2'",
+    "solarize": "lutrgb='r=if(gt(val,128),255-val,val)':g='if(gt(val,128),255-val,val)':b='if(gt(val,128),255-val,val)'",
+    "high_contrast": "eq=contrast=2.0",
+    "low_contrast": "eq=contrast=0.5:brightness=0.1",
+    "vibrance": "eq=saturation=1.6:contrast=1.3",
+    "chromashift": "split=3[r][g][b];[r]lutrgb=g=0:b=0[rr];[g]lutrgb=r=0:b=0[gg];[b]lutrgb=r=0:g=0[bb];[rr][gg]blend=all_mode=addition[rg];[rg][bb]blend=all_mode=addition",
+    "blur": "boxblur=8:2",
+    "pixelate": "scale=iw/8:ih/8,scale=iw*8:ih*8:flags=neighbor",
+}
+
+
+def pick_clip_effect(clip_effects: list[dict] | None, index: int) -> str:
+    """Choose an effect for clip `index`. `clip_effects` is recipe config:
+      [{"every": 2, "effect": "negate"}, {"every": 3, "effect": "edges"}]
+    Later rules override earlier ones. Returns an ffmpeg vf chain or "null"."""
+    if not clip_effects:
+        return "null"
+    chosen = "null"
+    for rule in clip_effects:
+        every = int(rule.get("every", 1))
+        offset = int(rule.get("offset", 0))
+        effect = rule.get("effect", "none")
+        if every < 1:
+            continue
+        if (index - offset) % every == 0 and (index - offset) >= 0:
+            chosen = CLIP_EFFECTS.get(effect, "null")
+    return chosen
+
 # Pools each "alias" type samples from when its mode is "random".
 _RANDOM_POOLS: dict[str, list[str]] = {
     "xfade": XFADE_MODES,

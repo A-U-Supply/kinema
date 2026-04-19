@@ -1,0 +1,17 @@
+name: Edge Only
+description: >
+  Every image rendered as its own edge-detected skeleton. Stark black
+  backgrounds with luminous line art. The slideshow becomes a procession
+  of outlines.
+
+clip_effects:
+  - every: 1
+    effect: edges
+
+transitions:
+  - type: xfade
+    weight: 2.0
+    params: { mode: fade, duration: 0.6 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: dissolve, duration: 0.6 }

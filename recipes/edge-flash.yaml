@@ -1,0 +1,17 @@
+name: Edge Flash
+description: >
+  Normal image, then edge-detect version, then normal, then edges —
+  alternating. The contrast between a full photograph and its
+  edge-extraction reads as a film strip being X-rayed.
+
+clip_effects:
+  - every: 2
+    effect: edges_hard
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: pixelize, duration: 0.3 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: fadewhite, duration: 0.3 }

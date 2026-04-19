@@ -1,0 +1,23 @@
+name: Beat Invert
+description: >
+  Beat-synced cuts with every other beat showing an inverted frame. The
+  negative flashes land exactly on the downbeat opposite — so the music
+  and visuals pulse out of phase.
+
+beat_sync: true
+beat_skip: 1
+
+clip_effects:
+  - every: 2
+    effect: negate
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: fadeblack, duration: 0.10 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: pixelize, duration: 0.10 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: hlslice, duration: 0.10 }

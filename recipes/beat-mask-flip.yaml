@@ -1,0 +1,32 @@
+name: Beat Mask Flip
+description: >
+  Cuts on every other beat, alternating masked wipe + negate. The image
+  gets wiped in, then inverted, then revealed clean, then inverted —
+  each mask transition a different shape.
+
+beat_sync: true
+beat_skip: 2
+
+clip_effects:
+  - every: 2
+    effect: negate
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: wipeleft, duration: 0.30 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: wipeup, duration: 0.30 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: circleopen, duration: 0.35 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: circleclose, duration: 0.35 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: diagtl, duration: 0.30 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: hlslice, duration: 0.25 }

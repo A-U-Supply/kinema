@@ -1,0 +1,22 @@
+name: Sepia Ghost
+description: >
+  Every image toned sepia, every 3rd image fully desaturated — so the
+  music video reads as an archive: brown-tinted, then suddenly a
+  monochrome snapshot, then brown again.
+
+clip_effects:
+  - every: 1
+    effect: sepia
+  - every: 3
+    effect: desaturate
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: fade, duration: 0.8 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: fadegrays, duration: 0.6 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: distance, duration: 0.5 }

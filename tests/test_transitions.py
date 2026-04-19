@@ -81,15 +81,13 @@ def test_empty_pool_raises() -> None:
 
 
 @pytest.mark.parametrize(
-    "name,path",
-    [
-        ("smooth-fade", REPO_ROOT / "recipes" / "smooth-fade.yaml"),
-        ("mask-bleed", REPO_ROOT / "recipes" / "mask-bleed.yaml"),
-        ("glitch-cut", REPO_ROOT / "recipes" / "glitch-cut.yaml"),
-        ("hybrid-wash", REPO_ROOT / "recipes" / "hybrid-wash.yaml"),
-    ],
+    "path",
+    sorted((REPO_ROOT / "recipes").glob("*.yaml")),
+    ids=lambda p: p.stem,
 )
-def test_shipped_recipes_load_and_sample(name: str, path: Path) -> None:
+def test_shipped_recipes_load_and_sample(path: Path) -> None:
+    """Every file in recipes/ must parse and produce a sampleable transition
+    of a known type. This catches typos in new recipes before they ship."""
     recipe = Recipe.load(path)
     assert recipe.name
     rng = random.Random(0)

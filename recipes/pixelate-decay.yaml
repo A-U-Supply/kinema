@@ -1,0 +1,23 @@
+name: Pixelate Decay
+description: >
+  Low-res chunky pixelation on every clip, alternating with high-contrast
+  threshold. Pairs well with harsh / electronic music.
+
+clip_effects:
+  - every: 2
+    offset: 0
+    effect: pixelate
+  - every: 2
+    offset: 1
+    effect: high_contrast
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: pixelize, duration: 0.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: hlslice, duration: 0.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: vuslice, duration: 0.2 }

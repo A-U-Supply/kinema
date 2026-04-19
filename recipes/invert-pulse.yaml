@@ -1,0 +1,20 @@
+name: Invert Pulse
+description: >
+  Every other image is color-inverted, joined by hard wipe transitions.
+  The eye never settles into one color palette — it keeps flipping to
+  the negative and back.
+
+clip_effects:
+  - every: 2
+    effect: negate
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: wipeleft, duration: 0.4 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: wiperight, duration: 0.4 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: fade, duration: 0.3 }

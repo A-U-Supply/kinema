@@ -1,0 +1,19 @@
+name: Threshold Punch
+description: >
+  Every clip flattened to pure black-and-white. Abrupt cuts. Reads like
+  stencil art — no grays, no softness, just silhouettes.
+
+clip_effects:
+  - every: 1
+    effect: threshold
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: fadeblack, duration: 0.25 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: wipeleft, duration: 0.30 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: slideup, duration: 0.30 }

@@ -1,0 +1,27 @@
+name: Beat Strobe
+description: >
+  Beat-synced cuts alternating normal / high-contrast / negated /
+  threshold. Every beat is a jolt — the palette can't decide what it
+  wants to be. Use with percussive music.
+
+beat_sync: true
+beat_skip: 1
+
+clip_effects:
+  - every: 4
+    offset: 1
+    effect: high_contrast
+  - every: 4
+    offset: 2
+    effect: negate
+  - every: 4
+    offset: 3
+    effect: threshold
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: fadeblack, duration: 0.08 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: pixelize, duration: 0.08 }

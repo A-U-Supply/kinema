@@ -1,0 +1,19 @@
+name: Hue Drift
+description: >
+  Each clip has its colors rotating through hue continuously. Combined
+  with long smooth fades, produces a slow psychedelic wash.
+
+clip_effects:
+  - every: 1
+    effect: hue_drift
+
+transitions:
+  - type: xfade
+    weight: 2.0
+    params: { mode: fade, duration: 1.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: radial, duration: 1.4 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: smoothup, duration: 1.2 }

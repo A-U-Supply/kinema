@@ -24,7 +24,7 @@ from pathlib import Path
 import yaml
 
 from kinema.titles import ASPECT_DIMS, render_title_card
-from kinema.transitions import TransitionSpec, sample_transition
+from kinema.transitions import TransitionSpec, pick_clip_effect, sample_transition
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ class Recipe:
     transitions: list[dict]
     beat_sync: bool = False
     beat_skip: int = 1  # skip=1 cut every beat, 2 every other, 4 every bar
+    clip_effects: list[dict] | None = None  # e.g. [{"every":2,"effect":"negate"}]
 
     @classmethod
     def load(cls, path: Path) -> "Recipe":
@@ -46,6 +47,7 @@ class Recipe:
             transitions=data["transitions"],
             beat_sync=bool(data.get("beat_sync", False)),
             beat_skip=int(data.get("beat_skip", 1)),
+            clip_effects=data.get("clip_effects"),
         )
 
 
@@ -74,10 +76,18 @@ def _run_ffmpeg(cmd: list[str], *, label: str) -> None:
         )
 
 
-def _render_still_clip(image: Path, duration: float, width: int, height: int, out: Path) -> None:
-    """Image → fixed-length .mp4 with normalized aspect/fps/format."""
+def _render_still_clip(
+    image: Path, duration: float, width: int, height: int, out: Path,
+    effect: str = "null",
+) -> None:
+    """Image → fixed-length .mp4 with normalized aspect/fps/format.
+    `effect` is an ffmpeg vf chain applied BEFORE the scale+pad (so the
+    effect runs on the full-res source)."""
     out.parent.mkdir(parents=True, exist_ok=True)
+    # Effect first (on full-res source), then normalize.
+    effect_chain = f"{effect}," if effect and effect != "null" else ""
     vf = (
+        f"{effect_chain}"
         f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
         f"setsar=1,format=yuv420p,fps=24"
@@ -260,12 +270,14 @@ def run_pipeline(
         recipe.name, len(inputs), audio_seconds, aspect, recipe.beat_sync, plan_T,
     )
 
-    # 1) Render each input image into a still mp4 clip of its own duration.
+    # 1) Render each input image into a still mp4 clip of its own duration,
+    # with per-clip visual effect rotated from the recipe's clip_effects list.
     clips_dir = workdir / "clips"
     clips: list[Path] = []
     for i, img in enumerate(inputs):
         clip = clips_dir / f"clip_{i:04d}.mp4"
-        _render_still_clip(img, durations[i], width, height, clip)
+        effect = pick_clip_effect(recipe.clip_effects, i)
+        _render_still_clip(img, durations[i], width, height, clip, effect=effect)
         clips.append(clip)
         if (i + 1) % 20 == 0:
             logger.info("clips rendered: %d/%d", i + 1, len(inputs))

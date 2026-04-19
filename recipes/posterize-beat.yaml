@@ -1,0 +1,23 @@
+name: Posterize Beat
+description: >
+  Beat-synced cuts, every image posterized to a reduced palette. Reads
+  like a low-bitrate render — flat color blocks where gradients used to
+  be.
+
+beat_sync: true
+beat_skip: 2
+
+clip_effects:
+  - every: 1
+    effect: posterize
+
+transitions:
+  - type: xfade
+    weight: 2.0
+    params: { mode: wipeleft, duration: 0.25 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: circleopen, duration: 0.30 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: hlslice, duration: 0.25 }
