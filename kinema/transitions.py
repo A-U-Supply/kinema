@@ -21,6 +21,14 @@ import random
 from dataclasses import dataclass
 from typing import Callable
 
+# Common frame rate for every intermediate stream in the pipeline. Clip
+# renders, filter-graph input normalization, and tween output all pin to
+# this. xfade requires its two input links to agree on frame_rate AND
+# time_base — using `fps=TARGET_FPS` consistently sets both (→ N/1 and 1/N)
+# so xfade + tween chains never trip xfade's input-compatibility check.
+TARGET_FPS = 24
+
+
 # Full set of xfade transition names available in ffmpeg ≥ 4.3
 XFADE_MODES = [
     "fade", "wipeleft", "wiperight", "wipeup", "wipedown",
@@ -74,13 +82,19 @@ def xfade(a: str, b: str, duration: float, offset: float, *, mode: str = "fade")
 
 def tween(a: str, b: str, duration: float, offset: float, *, fps: int = 30, base: str = "fade") -> str:
     """Motion-compensated tween via minterpolate. CPU-heavy; v1 may swap in
-    RIFE/FILM via Modal. Pin fps + timebase at the tail so it's concatenable
-    with other xfades (minterpolate rewrites timebase to 1/fps*N, which
-    crashes subsequent xfade steps expecting 1/fps)."""
+    RIFE/FILM via Modal.
+
+    `fps` is the *internal* minterpolate rate — running above the clip fps
+    gives minterpolate more resolution for motion-compensated synthesis.
+    The trailing `fps=TARGET_FPS` downsamples the result back to the shared
+    pipeline rate so the tween's output chains cleanly with fresh xfade
+    inputs (also pinned to TARGET_FPS). Without this normalization, xfade
+    refuses to pair a 30fps tween output with a 24fps raw input, and also
+    complains about the AVTB/native-mp4 timebase mismatch."""
     return (
         f"[{a}][{b}]xfade=transition={base}:duration={duration:.3f}:offset={offset:.3f},"
         f"minterpolate=fps={fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir,"
-        f"fps={fps},settb=AVTB,setpts=PTS-STARTPTS"
+        f"fps={TARGET_FPS}"
     )
 
 
