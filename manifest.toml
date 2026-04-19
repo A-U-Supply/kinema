@@ -115,7 +115,7 @@ type = "select"
 label = "Title Card"
 options = ["track_title", "custom", "none"]
 default = "track_title"
-no_flag = true
+flag = "--title-card"
 
 [params.title]
 type = "string"

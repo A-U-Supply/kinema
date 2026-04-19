@@ -104,7 +104,9 @@ def _build_filter_graph(
     # Edge case: only 2 images → final label is vout from the single xfade above.
     # Edge case: only 1 image → no transition; alias v0 → vout.
     if n_images == 1:
-        parts.append("[v0]copy[vout]")
+        # `null` is the pass-through video filter; `copy` is for stream copy
+        # outside of filter graphs and crashes here.
+        parts.append("[v0]null[vout]")
 
     return ";".join(parts), "vout"
 
@@ -169,6 +171,14 @@ def run_pipeline(
         str(out_path),
     ]
 
-    logger.debug("ffmpeg cmd: %s", " ".join(cmd))
-    subprocess.run(cmd, check=True)
+    logger.info("ffmpeg cmd: %s", " ".join(cmd))
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        # Surface ffmpeg's last 60 lines so worker log_tail shows the real cause.
+        tail = "\n".join((proc.stderr or "").splitlines()[-60:])
+        raise RuntimeError(
+            f"ffmpeg failed with exit {proc.returncode}\n"
+            f"--- filter_complex ---\n{filter_graph}\n"
+            f"--- ffmpeg stderr (tail) ---\n{tail}"
+        )
     return out_path

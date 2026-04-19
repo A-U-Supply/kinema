@@ -113,8 +113,14 @@ def main() -> None:
     p.add_argument("--recipe", default="hybrid-wash", help="recipe name (resolved against /app/recipes/) or path")
     p.add_argument("--aspect", choices=["16:9", "9:16", "1:1"], default="16:9")
     p.add_argument("--sec-per-image", type=float, default=1.5)
-    p.add_argument("--title", help="title card text — overrides default from audio")
-    p.add_argument("--no-title", action="store_true", help="skip title card even if audio supplies one")
+    p.add_argument(
+        "--title-card",
+        choices=["track_title", "custom", "none"],
+        default="track_title",
+        help="track_title=use audio title; custom=use --title; none=no card",
+    )
+    p.add_argument("--title", help="text used when --title-card=custom")
+    p.add_argument("--no-title", action="store_true", help="alias for --title-card=none")
     p.add_argument("--seed", type=int)
     p.add_argument("--output", "-o", required=True, type=Path)
     p.add_argument("--workdir", type=Path)
@@ -144,7 +150,13 @@ def main() -> None:
     image_paths = _resolve_images(args, workdir, picked_images)
     audio_path, default_title = _resolve_audio(args, workdir, picked_audio)
 
-    title_text = None if args.no_title else (args.title or default_title)
+    mode = "none" if args.no_title else args.title_card
+    if mode == "none":
+        title_text = None
+    elif mode == "custom":
+        title_text = args.title or None
+    else:  # track_title
+        title_text = default_title
 
     run_pipeline(
         recipe_path=recipe_arg,
