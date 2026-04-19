@@ -94,6 +94,7 @@ options = [
   "film-leader", "tape-decay",
   "glitch-cut", "rapid-fire",
   "hybrid-wash", "chaos-shuffle",
+  "beat-sync-fast", "beat-sync-half", "beat-drop",
 ]
 default = "hybrid-wash"
 required = true

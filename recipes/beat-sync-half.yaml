@@ -1,0 +1,27 @@
+name: Beat Sync Half
+description: >
+  Cuts on every OTHER beat — so images hold twice as long, giving room
+  for longer wipes and circle transitions that still land on downbeats.
+
+beat_sync: true
+beat_skip: 2
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: wipeleft,   duration: 0.25 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: wiperight,  duration: 0.25 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: circleopen, duration: 0.30 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: slideleft,  duration: 0.25 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: radial,     duration: 0.30 }
+  - type: xfade
+    weight: 0.7
+    params: { mode: hlslice,    duration: 0.20 }

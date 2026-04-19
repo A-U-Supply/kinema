@@ -34,6 +34,8 @@ class Recipe:
     name: str
     description: str
     transitions: list[dict]
+    beat_sync: bool = False
+    beat_skip: int = 1  # skip=1 cut every beat, 2 every other, 4 every bar
 
     @classmethod
     def load(cls, path: Path) -> "Recipe":
@@ -42,6 +44,8 @@ class Recipe:
             name=data["name"],
             description=data.get("description", ""),
             transitions=data["transitions"],
+            beat_sync=bool(data.get("beat_sync", False)),
+            beat_skip=int(data.get("beat_skip", 1)),
         )
 
 
@@ -90,23 +94,26 @@ def _render_still_clip(image: Path, duration: float, width: int, height: int, ou
 
 
 def _render_chunk(
-    clips: list[Path], specs: list[TransitionSpec], sec_per_image: float, out: Path,
+    clips: list[Path], specs: list[TransitionSpec], durations: list[float], out: Path,
 ) -> float:
     """Chain `clips` with `specs` xfades in a single filter_complex.
-    Returns the chunk's video duration."""
+    `durations[i]` is the length of clip i (per-image, supports variable-length
+    beat-synced clips). Returns the chunk's total video duration."""
     out.parent.mkdir(parents=True, exist_ok=True)
     n = len(clips)
     assert len(specs) == n - 1, f"need {n-1} transitions for {n} clips, got {len(specs)}"
+    assert len(durations) == n, f"need {n} durations, got {len(durations)}"
 
-    # Build inputs and filter graph. Each clip is already normalized; just
-    # alias [{i}:v] → [v{i}] so the xfade chain is uniform.
     parts = [f"[{i}:v]null[v{i}]" for i in range(n)]
-    cumulative_offset = 0.0
+    # Offset for xfade i is the time in the running output where image i+1's
+    # transition begins — equals the cumulative duration seen so far minus the
+    # transition's own duration (so the transition ends when clip i would have).
+    cumulative = 0.0
     prev = "v0"
     for i, spec in enumerate(specs):
-        cumulative_offset += sec_per_image - spec.duration
+        cumulative += durations[i] - spec.duration
         next_label = f"x{i+1}" if i < n - 2 else "vout"
-        parts.append(f"{spec.filter_str(prev, f'v{i+1}', cumulative_offset)}[{next_label}]")
+        parts.append(f"{spec.filter_str(prev, f'v{i+1}', cumulative)}[{next_label}]")
         prev = next_label
     if n == 1:
         parts.append("[v0]null[vout]")
@@ -123,9 +130,7 @@ def _render_chunk(
         str(out),
     ]
     _run_ffmpeg(cmd, label=f"chunk {out.name} ({n} clips)")
-
-    # Chunk duration = sum(sec_per_image) - sum(transition_durations)
-    return sec_per_image * n - sum(s.duration for s in specs)
+    return sum(durations) - sum(s.duration for s in specs)
 
 
 def _xfade_pair(
@@ -198,25 +203,36 @@ def run_pipeline(
         raise ValueError(f"need at least 2 images (incl. title card), got {len(inputs)}")
 
     audio_seconds = _ffprobe_duration(audio_path)
-    # Use the recipe's mean transition duration as the planning baseline, and
-    # the MAX as the floor for sec_per_image — a recipe with 2.5s transitions
-    # can't use a 1.5s/image default.
     durs = [float((t.get("params") or {}).get("duration", 0.5)) for t in recipe.transitions]
     plan_T = sum(durs) / max(1, len(durs))
     max_T = max(durs) if durs else 0.5
-    if sec_per_image <= max_T:
-        # Auto-bump rather than erroring. Keeps slow-burn etc. usable with defaults.
-        sec_per_image = max_T + 0.5
-        logger.info("bumped sec_per_image → %.2fs to exceed recipe's longest transition (%.2fs)",
-                    sec_per_image, max_T)
 
-    # Cap cycled image count — a recipe where transition duration ≈ sec_per_image
-    # mathematically asks for thousands of clips, which destroys render time and
-    # disk use. 120 images at 1.5s/each gives a ~3-minute video; anything longer
-    # than that gets -shortest'd against the audio.
-    per_image_net = max(0.1, sec_per_image - plan_T)
-    target_images = max(2, int(audio_seconds / per_image_net) + 1)
-    target_images = min(target_images, 120)
+    # For beat-synced recipes, image durations come from the audio's beats.
+    per_image_durations: list[float] | None = None
+    if recipe.beat_sync:
+        from kinema.beats import beat_intervals
+        # Use a transition-duration-aware min_dur so we don't try to fit a
+        # longer transition into a shorter image.
+        min_dur = max(0.15, max_T + 0.05)
+        per_image_durations = beat_intervals(audio_path, skip=recipe.beat_skip, min_dur=min_dur)
+        # Cap length for render time — 120 beats ≈ 1 minute at 120 BPM, enough.
+        per_image_durations = per_image_durations[:120]
+        target_images = len(per_image_durations)
+        if target_images < 2:
+            logger.warning("beat detection returned %d intervals, falling back to fixed cadence",
+                           target_images)
+            per_image_durations = None
+            recipe.beat_sync = False
+
+    if not recipe.beat_sync:
+        if sec_per_image <= max_T:
+            sec_per_image = max_T + 0.5
+            logger.info("bumped sec_per_image → %.2fs to exceed recipe's longest transition (%.2fs)",
+                        sec_per_image, max_T)
+        per_image_net = max(0.1, sec_per_image - plan_T)
+        target_images = max(2, int(audio_seconds / per_image_net) + 1)
+        target_images = min(target_images, 120)
+
     if len(inputs) < target_images:
         cycled: list[Path] = []
         i = 0
@@ -224,18 +240,32 @@ def run_pipeline(
             cycled.append(inputs[i % len(inputs)])
             i += 1
         inputs = cycled
+    # Truncate if user provided more images than we want.
+    if len(inputs) > target_images:
+        inputs = inputs[:target_images]
+
+    # Build per-image duration list. For beat-sync, use the detected intervals
+    # (capped/padded to match cycled input count); otherwise flat sec_per_image.
+    if per_image_durations is not None:
+        # The target_images already matches len(per_image_durations).
+        durations = list(per_image_durations[: len(inputs)])
+        # Pad if somehow short.
+        while len(durations) < len(inputs):
+            durations.append(max_T + 0.5)
+    else:
+        durations = [sec_per_image] * len(inputs)
 
     logger.info(
-        "rendering: recipe=%s images=%d audio=%.1fs aspect=%s sec/image=%.2f plan_T=%.2f",
-        recipe.name, len(inputs), audio_seconds, aspect, sec_per_image, plan_T,
+        "rendering: recipe=%s images=%d audio=%.1fs aspect=%s beat_sync=%s plan_T=%.2f",
+        recipe.name, len(inputs), audio_seconds, aspect, recipe.beat_sync, plan_T,
     )
 
-    # 1) Render each input image into a still mp4 clip.
+    # 1) Render each input image into a still mp4 clip of its own duration.
     clips_dir = workdir / "clips"
     clips: list[Path] = []
     for i, img in enumerate(inputs):
         clip = clips_dir / f"clip_{i:04d}.mp4"
-        _render_still_clip(img, sec_per_image, width, height, clip)
+        _render_still_clip(img, durations[i], width, height, clip)
         clips.append(clip)
         if (i + 1) % 20 == 0:
             logger.info("clips rendered: %d/%d", i + 1, len(inputs))
@@ -248,13 +278,14 @@ def run_pipeline(
     chunk_dir = workdir / "chunks"
     for ci in range(0, len(clips), CHUNK_SIZE):
         group = clips[ci : ci + CHUNK_SIZE]
+        group_durs = durations[ci : ci + CHUNK_SIZE]
         chunk_path = chunk_dir / f"chunk_{ci // CHUNK_SIZE:04d}.mp4"
         if len(group) == 1:
             shutil.copy2(group[0], chunk_path)
-            chunk_dur = sec_per_image
+            chunk_dur = group_durs[0]
         else:
             chunk_specs = [sample_transition(recipe.transitions, rng) for _ in range(len(group) - 1)]
-            chunk_dur = _render_chunk(group, chunk_specs, sec_per_image, chunk_path)
+            chunk_dur = _render_chunk(group, chunk_specs, group_durs, chunk_path)
         chunks.append((chunk_path, chunk_dur))
         logger.info("chunk %d/%d → %.1fs", ci // CHUNK_SIZE + 1, (len(clips) + CHUNK_SIZE - 1) // CHUNK_SIZE, chunk_dur)
 
