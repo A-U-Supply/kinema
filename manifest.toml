@@ -20,6 +20,9 @@ min_items = 0
 max_items = 500
 allow_random_fill = true
 
+[env]
+pass_through = ["AU_API_KEY"]
+
 [output]
 index = "kinema-outputs"
 

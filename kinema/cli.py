@@ -93,7 +93,10 @@ def _resolve_audio(args: argparse.Namespace, workdir: Path, picked_audio: list[P
 
 def main() -> None:
     p = argparse.ArgumentParser("kinema")
-    p.add_argument("--input", nargs="*", help="image paths (used when --image-source=picked)")
+    # Defaults below MUST match the manifest defaults — the a-u.supply worker
+    # omits a flag whenever the param value equals the manifest default, so the
+    # CLI must reach the same value via argparse defaults.
+    p.add_argument("--input", nargs="*", help="image and/or audio paths (worker mounts /work/input/)")
     p.add_argument("--image-source", choices=["picked", "search", "random"], default="picked")
     p.add_argument("--image-query", help="JSON filter object for search index")
     p.add_argument("--image-count", type=int, default=120)
@@ -101,12 +104,12 @@ def main() -> None:
     p.add_argument(
         "--audio-source",
         choices=["upload", "random_release", "pick_release", "search"],
-        default="upload",
+        default="random_release",
     )
     p.add_argument("--audio-query", help="JSON filter object for search index")
     p.add_argument("--release-code")
     p.add_argument("--release-track", type=int)
-    p.add_argument("--recipe", required=True, help="recipe name (resolved against /app/recipes/) or path")
+    p.add_argument("--recipe", default="hybrid-wash", help="recipe name (resolved against /app/recipes/) or path")
     p.add_argument("--aspect", choices=["16:9", "9:16", "1:1"], default="16:9")
     p.add_argument("--sec-per-image", type=float, default=1.5)
     p.add_argument("--title", help="title card text — overrides default from audio")
