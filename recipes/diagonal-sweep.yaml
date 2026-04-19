@@ -1,0 +1,31 @@
+name: Diagonal Sweep
+description: >
+  Diagonal wipes only — corners as origins, hexagonal-style sweeps. Less
+  predictable than the cardinal directions; gives the cuts an
+  off-balance, sketched feel.
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: diagtl,   duration: 1.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: diagtr,   duration: 1.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: diagbl,   duration: 1.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: diagbr,   duration: 1.2 }
+  - type: xfade
+    weight: 0.5
+    params: { mode: wipetl,   duration: 1.0 }
+  - type: xfade
+    weight: 0.5
+    params: { mode: wipetr,   duration: 1.0 }
+  - type: xfade
+    weight: 0.5
+    params: { mode: wipebl,   duration: 1.0 }
+  - type: xfade
+    weight: 0.5
+    params: { mode: wipebr,   duration: 1.0 }

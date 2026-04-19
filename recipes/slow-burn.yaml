@@ -1,0 +1,18 @@
+name: Slow Burn
+description: >
+  Very slow dissolves and circle pulls. Almost meditative — each frame
+  has time to breathe. Pair with sec_per_image >= 3.0.
+
+transitions:
+  - type: xfade
+    weight: 3.0
+    params: { mode: fade,        duration: 2.5 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: dissolve,    duration: 2.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: circleopen,  duration: 2.5 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: radial,      duration: 2.5 }

@@ -1,0 +1,24 @@
+name: Tape Decay
+description: >
+  Failing-VHS feel — fades-to-grays, distance fields, dropouts to white
+  and black. Each cut a glitch, but a lyrical one.
+
+transitions:
+  - type: xfade
+    weight: 2.0
+    params: { mode: fadegrays, duration: 0.5 }
+  - type: xfade
+    weight: 2.0
+    params: { mode: distance,  duration: 0.5 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: fadeblack, duration: 0.30 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: fadewhite, duration: 0.30 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: hblur,     duration: 0.6 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: pixelize,  duration: 0.30 }

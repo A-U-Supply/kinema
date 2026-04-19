@@ -1,0 +1,24 @@
+name: Side Wipes
+description: >
+  Cinematic horizontal wipes only — left and right. Frames pushed sideways
+  off the screen by the next, like film-strip storytelling.
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: wipeleft,    duration: 1.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: wiperight,   duration: 1.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: slideleft,   duration: 1.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: slideright,  duration: 1.0 }
+  - type: xfade
+    weight: 0.5
+    params: { mode: smoothleft,  duration: 1.4 }
+  - type: xfade
+    weight: 0.5
+    params: { mode: smoothright, duration: 1.4 }

@@ -1,0 +1,18 @@
+name: Slice Storm
+description: >
+  Hard horizontal/vertical slice transitions, fast and percussive. Each
+  cut feels like a venetian-blind snap. Designed to ride a beat.
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: hlslice, duration: 0.30 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: hrslice, duration: 0.30 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: vuslice, duration: 0.30 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: vdslice, duration: 0.30 }

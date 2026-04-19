@@ -1,0 +1,22 @@
+name: Iris Only
+description: >
+  Every cut a circular reveal — circles opening, closing, cropping. Each
+  image is brought into focus from a single point and then closed off
+  before the next. Reads like a slow-shutter focal pull.
+
+transitions:
+  - type: xfade
+    weight: 2.0
+    params: { mode: circleopen,  duration: 1.4 }
+  - type: xfade
+    weight: 2.0
+    params: { mode: circleclose, duration: 1.4 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: circlecrop,  duration: 1.6 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: rectcrop,    duration: 1.4 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: radial,      duration: 1.2 }

@@ -85,8 +85,16 @@ depends_on = { param = "audio_source", value = "pick_track" }
 [params.recipe]
 type = "select"
 label = "Transition Recipe"
-description = "Which transition pool to sample from"
-options = ["smooth-fade", "mask-bleed", "glitch-cut", "hybrid-wash"]
+description = "Which transition pool to sample from. mask-* and *-only recipes focus on a single transition family; hybrid-wash and chaos-shuffle mix everything."
+options = [
+  "smooth-fade", "soft-bloom", "slow-burn",
+  "mask-bleed", "all-mask-random",
+  "iris-only", "side-wipes", "vertical-pulse", "diagonal-sweep",
+  "slice-storm", "squeeze-snap", "focus-pull",
+  "film-leader", "tape-decay",
+  "glitch-cut", "rapid-fire",
+  "hybrid-wash", "chaos-shuffle",
+]
 default = "hybrid-wash"
 required = true
 flag = "--recipe"

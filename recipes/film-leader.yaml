@@ -1,0 +1,19 @@
+name: Film Leader
+description: >
+  Old projector cuts — alternating fade-to-black and fade-to-white,
+  with the occasional pixelized stutter. Reads like leader frames
+  between reels.
+
+transitions:
+  - type: xfade
+    weight: 2.0
+    params: { mode: fadeblack, duration: 0.5 }
+  - type: xfade
+    weight: 2.0
+    params: { mode: fadewhite, duration: 0.5 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: fadegrays, duration: 0.6 }
+  - type: xfade
+    weight: 0.5
+    params: { mode: pixelize,  duration: 0.30 }

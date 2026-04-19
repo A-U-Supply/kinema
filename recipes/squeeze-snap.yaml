@@ -1,0 +1,21 @@
+name: Squeeze Snap
+description: >
+  Each transition crushes the outgoing frame — horizontal then vertical
+  squeezes, snapping closed before the next image expands open. Punchy.
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: squeezeh,   duration: 0.5 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: squeezev,   duration: 0.5 }
+  - type: xfade
+    weight: 0.7
+    params: { mode: vertclose,  duration: 0.6 }
+  - type: xfade
+    weight: 0.7
+    params: { mode: horzclose,  duration: 0.6 }
+  - type: xfade
+    weight: 0.5
+    params: { mode: zoomin,     duration: 0.7 }

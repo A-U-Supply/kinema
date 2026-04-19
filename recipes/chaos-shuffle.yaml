@@ -1,0 +1,21 @@
+name: Chaos Shuffle
+description: >
+  Every available transition, every length. Uniform random — no two
+  consecutive cuts will look like each other.
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: random, duration: 0.4 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: random, duration: 0.7 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: random, duration: 1.2 }
+  - type: mask
+    weight: 1.0
+    params: { mode: random, duration: 1.0 }
+  - type: glitch
+    weight: 1.0
+    params: { mode: random, duration: 0.3 }

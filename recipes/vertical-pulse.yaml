@@ -1,0 +1,30 @@
+name: Vertical Pulse
+description: >
+  Up/down only. Wipes, slides, vertical opens and closes. Reads like
+  shutters and elevator doors — gravity-aware motion.
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: wipeup,      duration: 1.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: wipedown,    duration: 1.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: slideup,     duration: 0.9 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: slidedown,   duration: 0.9 }
+  - type: xfade
+    weight: 0.8
+    params: { mode: vertopen,    duration: 1.1 }
+  - type: xfade
+    weight: 0.8
+    params: { mode: vertclose,   duration: 1.1 }
+  - type: xfade
+    weight: 0.5
+    params: { mode: smoothup,    duration: 1.4 }
+  - type: xfade
+    weight: 0.5
+    params: { mode: smoothdown,  duration: 1.4 }

@@ -1,0 +1,24 @@
+name: Rapid Fire
+description: >
+  Frantic — every transition is sharp, very short, no time to settle.
+  Use with shorter sec_per_image (try 0.7s) for a chase-cut feel.
+
+transitions:
+  - type: xfade
+    weight: 1.0
+    params: { mode: pixelize,  duration: 0.15 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: hlslice,   duration: 0.15 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: vuslice,   duration: 0.15 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: distance,  duration: 0.20 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: fadeblack, duration: 0.15 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: wipeleft,  duration: 0.20 }

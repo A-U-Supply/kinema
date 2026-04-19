@@ -147,19 +147,37 @@ def run_pipeline(
 
     inputs: list[Path] = list(image_paths)
     if title_text:
-        title_png = render_title_card(title_text, aspect, workdir / "title.png")
+        # Texture the 3D block letters with a random source image.
+        src_for_title = rng.choice(image_paths) if image_paths else None
+        title_png = render_title_card(
+            title_text, aspect, workdir / "title.png",
+            source_image=src_for_title, seed=seed,
+        )
         inputs = [title_png, *inputs]
 
     if len(inputs) < 2:
         raise ValueError(f"need at least 2 images (incl. title card), got {len(inputs)}")
 
     audio_seconds = _ffprobe_duration(audio_path)
-    plan_T = float((recipe.transitions[0].get("params") or {}).get("duration", 0.5))
+    # Use the recipe's mean transition duration as the planning baseline.
+    durs = [float((t.get("params") or {}).get("duration", 0.5)) for t in recipe.transitions]
+    plan_T = sum(durs) / max(1, len(durs))
     _check_inputs(sec_per_image, plan_T)
 
+    # Cycle inputs to fill the audio length so the whole track plays.
+    # Pairwise rendering keeps memory bounded so this is safe even at N=200+.
+    target_images = max(2, int((audio_seconds + plan_T) / max(0.01, sec_per_image - plan_T)) + 1)
+    if len(inputs) < target_images:
+        cycled: list[Path] = []
+        i = 0
+        while len(cycled) < target_images:
+            cycled.append(inputs[i % len(inputs)])
+            i += 1
+        inputs = cycled
+
     logger.info(
-        "rendering: recipe=%s images=%d audio=%.1fs aspect=%s sec/image=%.2f",
-        recipe.name, len(inputs), audio_seconds, aspect, sec_per_image,
+        "rendering: recipe=%s images=%d audio=%.1fs aspect=%s sec/image=%.2f plan_T=%.2f",
+        recipe.name, len(inputs), audio_seconds, aspect, sec_per_image, plan_T,
     )
 
     # 1) Render each image as a fixed-length clip.

@@ -1,0 +1,24 @@
+name: Soft Bloom
+description: >
+  Slow, halated transitions — long smooth-edged fades, radial pulls,
+  blurred dissolves. Designed for ambient or contemplative tracks.
+
+transitions:
+  - type: xfade
+    weight: 2.0
+    params: { mode: fade,        duration: 1.5 }
+  - type: xfade
+    weight: 2.0
+    params: { mode: dissolve,    duration: 1.4 }
+  - type: xfade
+    weight: 1.5
+    params: { mode: radial,      duration: 1.6 }
+  - type: xfade
+    weight: 1.5
+    params: { mode: hblur,       duration: 1.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: smoothleft,  duration: 1.6 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: smoothup,    duration: 1.6 }

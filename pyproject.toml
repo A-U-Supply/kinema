@@ -7,7 +7,13 @@ dependencies = [
     "Pillow>=10.0",
     "PyYAML>=6.0",
     "requests>=2.28",
+    "numpy>=1.24",
 ]
+
+# Ship the vendored fonts inside the wheel.
+[tool.hatch.build.targets.wheel]
+packages = ["kinema"]
+include = ["kinema/vendor/protease/fonts/*.ttf"]
 
 [project.optional-dependencies]
 dev = [

@@ -1,0 +1,16 @@
+name: All Mask Random
+description: >
+  Pure mask transitions, fully randomized — every wipe, slide, slice,
+  circle, vertical/horizontal open. Maximum mask variety, every cut a
+  surprise.
+
+transitions:
+  - type: mask
+    weight: 1.0
+    params: { mode: random, duration: 0.6 }
+  - type: mask
+    weight: 1.0
+    params: { mode: random, duration: 0.9 }
+  - type: mask
+    weight: 1.0
+    params: { mode: random, duration: 1.3 }

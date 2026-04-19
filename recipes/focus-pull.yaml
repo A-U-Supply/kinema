@@ -1,0 +1,21 @@
+name: Focus Pull
+description: >
+  Zoom-ins, radial pulls, smooth fades — every cut is a movement of the
+  eye toward something specific. Plays well with portrait-style images.
+
+transitions:
+  - type: xfade
+    weight: 2.0
+    params: { mode: zoomin,      duration: 1.0 }
+  - type: xfade
+    weight: 1.5
+    params: { mode: radial,      duration: 1.2 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: circleopen,  duration: 1.4 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: smoothup,    duration: 1.0 }
+  - type: xfade
+    weight: 1.0
+    params: { mode: smoothdown,  duration: 1.0 }
