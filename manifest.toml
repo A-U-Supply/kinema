@@ -113,7 +113,8 @@ flag = "--sec-per-image"
 [params.title_card]
 type = "select"
 label = "Title Card"
-options = ["track_title", "custom", "none"]
+description = "track_title = audio file's title · song_title = random from #song-titles · custom = your text · none = no card"
+options = ["track_title", "song_title", "custom", "none"]
 default = "track_title"
 flag = "--title-card"
 

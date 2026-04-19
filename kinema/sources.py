@@ -145,9 +145,28 @@ def random_release_track() -> tuple[str, str]:
 
 def download(url: str, dest: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with requests.get(url, headers=_headers(), stream=True, timeout=120) as r:
+    # Don't send a-u.supply auth headers to other origins.
+    use_headers = _headers() if url.startswith(_base_url()) else {}
+    with requests.get(url, headers=use_headers, stream=True, timeout=120) as r:
         r.raise_for_status()
         with dest.open("wb") as f:
             for chunk in r.iter_content(chunk_size=1 << 16):
                 f.write(chunk)
     return dest
+
+
+_SONG_TITLES_URL = (
+    "https://raw.githubusercontent.com/A-U-Supply/ausupply.github.io/"
+    "master/song-titles-bot/titles.json"
+)
+
+
+def random_song_title() -> str:
+    """Fetch the curated #song-titles list and return a random entry's text."""
+    r = requests.get(_SONG_TITLES_URL, timeout=15)
+    r.raise_for_status()
+    items = r.json()
+    titles = [t.get("title", "").strip() for t in items if t.get("title")]
+    if not titles:
+        raise RuntimeError("song titles list is empty")
+    return random.choice(titles)

@@ -113,9 +113,9 @@ def main() -> None:
     p.add_argument("--sec-per-image", type=float, default=1.5)
     p.add_argument(
         "--title-card",
-        choices=["track_title", "custom", "none"],
+        choices=["track_title", "song_title", "custom", "none"],
         default="track_title",
-        help="track_title=use audio title; custom=use --title; none=no card",
+        help="track_title=use audio title; song_title=random from #song-titles; custom=use --title; none=no card",
     )
     p.add_argument("--title", help="text used when --title-card=custom")
     p.add_argument("--no-title", action="store_true", help="alias for --title-card=none")
@@ -153,6 +153,8 @@ def main() -> None:
         title_text = None
     elif mode == "custom":
         title_text = args.title or None
+    elif mode == "song_title":
+        title_text = sources.random_song_title()
     else:  # track_title
         title_text = default_title
 
