@@ -53,9 +53,10 @@ def _ffprobe_duration(path: Path) -> float:
 
 
 # Hard cap to keep the filter_complex graph + decoder allocations within the
-# worker's 4GB / 2-CPU envelope. Real-world: 117 simultaneous image inputs
-# OOM-killed ffmpeg silently. ~40 has comfortable headroom.
-_MAX_IMAGES_IN_GRAPH = 40
+# worker's 4GB / 2-CPU envelope. Real-world: 12 inputs at 1920x1080 succeeds,
+# 15 inputs OOM-killed ffmpeg silently. v1 will pre-render clips and chain
+# pairwise so this cap can go away.
+_MAX_IMAGES_IN_GRAPH = 10
 
 
 def _check_inputs(sec_per_image: float, transition_seconds: float) -> None:
