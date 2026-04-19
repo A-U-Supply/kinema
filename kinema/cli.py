@@ -64,16 +64,17 @@ def _resolve_audio(args: argparse.Namespace, workdir: Path, picked_audio: list[P
         raise SystemExit("--audio-source=upload needs --audio or an audio file via --input")
 
     if args.audio_source == "random_release":
-        code, n, title = sources.random_release_track()
-        url = sources.stream_track_url(code, n)
-        dest = workdir / "audio" / f"{code}-{n}.audio"
+        code, track_id, title = sources.random_release_track()
+        url = sources.stream_track_url(code, track_id)
+        dest = workdir / "audio" / f"{code}-{track_id[:8]}.audio"
         sources.download(url, dest)
         return dest, title
 
     if args.audio_source == "pick_release":
         if not args.release_code or args.release_track is None:
             raise SystemExit("--release-code and --release-track required for pick_release")
-        url = sources.stream_track_url(args.release_code, args.release_track)
+        track_id = sources.find_track_id(args.release_code, args.release_track)
+        url = sources.stream_track_url(args.release_code, track_id)
         dest = workdir / "audio" / f"{args.release_code}-{args.release_track}.audio"
         sources.download(url, dest)
         return dest, None
