@@ -24,7 +24,7 @@ from pathlib import Path
 import yaml
 
 from kinema.titles import ASPECT_DIMS, render_title_card
-from kinema.transitions import TransitionSpec, pick_clip_effect, sample_transition
+from kinema.transitions import TARGET_FPS, TransitionSpec, pick_clip_effect, sample_transition
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ def _render_still_clip(
         f"{effect_chain}"
         f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
-        f"setsar=1,format=yuv420p,fps=24"
+        f"setsar=1,format=yuv420p,fps={TARGET_FPS}"
     )
     # GIFs use a different demuxer that doesn't accept `-loop 1` as a global
     # option. Use `-stream_loop -1` instead for animated formats — with
@@ -114,15 +114,13 @@ def _render_still_clip(
 def _build_chunk_filter(specs: list[TransitionSpec], durations: list[float]) -> str:
     """Filter-complex for `_render_chunk`. Pulled out so it's unit-testable.
 
-    Normalizes every input's timebase to AVTB (1/1_000_000) upfront. xfade
-    rejects mismatched input timebases, and a `tween` transition mid-chain
-    rewrites the running stream's tb to AVTB via its trailing settb — so any
-    downstream xfade that pairs that stream with a fresh, not-yet-normalized
-    input would crash. Normalizing all inputs keeps tb consistent whether or
-    not a tween appears in the chain.
+    Normalizes every input stream to TARGET_FPS upfront so xfade (which
+    requires matching frame_rate AND time_base on both inputs) can chain
+    xfade + tween transitions without tripping its compatibility check. A
+    plain `fps=N` filter sets both: frame_rate=N/1 and time_base=1/N.
     """
     n = len(durations)
-    parts = [f"[{i}:v]settb=AVTB,setpts=PTS-STARTPTS[v{i}]" for i in range(n)]
+    parts = [f"[{i}:v]fps={TARGET_FPS}[v{i}]" for i in range(n)]
     # Offset for xfade i is the time in the running output where image i+1's
     # transition begins — equals the cumulative duration seen so far minus the
     # transition's own duration (so the transition ends when clip i would have).

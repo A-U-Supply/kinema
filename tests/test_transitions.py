@@ -106,19 +106,33 @@ def test_check_inputs_accepts_normal_durations() -> None:
     _check_inputs(sec_per_image=1.5, transition_seconds=0.5)  # no raise
 
 
-def test_chunk_filter_normalizes_input_timebases() -> None:
-    """Regression: without this normalization, a tween mid-chain (which ends
-    in settb=AVTB) leaves the running stream with tb 1/1_000_000 while the
-    next raw mp4 input still carries the container's native tb (e.g. 1/12288
-    for 24fps). xfade rejects that mismatch."""
+def test_chunk_filter_pins_inputs_to_target_fps() -> None:
+    """Regression: xfade requires its two input links to agree on frame_rate
+    AND time_base. Without pinning every input to TARGET_FPS:
+      (a) raw mp4 inputs arrive at 1/12288 tb while a mid-chain tween output
+          sits at AVTB (1/1_000_000) → timebase mismatch.
+      (b) even with matching tb, any `setpts` in the filter chain clears
+          frame_rate to 1/0 → xfade rejects 'non-constant rate'.
+    Using `fps=N` everywhere sets both frame_rate=N/1 and time_base=1/N."""
+    from kinema.transitions import TARGET_FPS
     specs = [
         TransitionSpec(builder=xfade, duration=0.5, params={"mode": "fade"}, name="xfade"),
         TransitionSpec(builder=tween, duration=0.7, params={"fps": 30, "base": "dissolve"}, name="tween"),
         TransitionSpec(builder=xfade, duration=0.5, params={"mode": "wipeleft"}, name="xfade"),
     ]
     filt = _build_chunk_filter(specs, durations=[1.5, 1.5, 1.5, 1.5])
-    # Every input stream must be normalized before any xfade consumes it.
     for i in range(4):
-        assert f"[{i}:v]settb=AVTB,setpts=PTS-STARTPTS[v{i}]" in filt
+        assert f"[{i}:v]fps={TARGET_FPS}[v{i}]" in filt
+
+
+def test_tween_downsamples_to_target_fps() -> None:
+    """Regression: tween's trailing fps must equal TARGET_FPS so its output
+    chains with fresh inputs (also pinned to TARGET_FPS)."""
+    from kinema.transitions import TARGET_FPS
+    s = tween("a", "b", 0.4, 2.0, fps=30, base="dissolve")
+    # The LAST filter in the chain determines the output's frame_rate+tb.
+    assert s.endswith(f"fps={TARGET_FPS}")
+    # Settb=AVTB was the source of the original mismatch — must be gone.
+    assert "settb=AVTB" not in s
 
 
