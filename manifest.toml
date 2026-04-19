@@ -1,0 +1,122 @@
+name = "kinema"
+display_name = "kinēma"
+description = "Music video generator — turns indexed images and release audio into morphing videos"
+long_description = """
+κίνημα. Pulls images from any output index (or your picks, or pure random),
+audio from a release track or any audio search result, and renders a music
+video by chaining transition recipes — cross-fades, masks, glitches, tweens.
+
+v0 is FFmpeg-only on CPU. Recipes are TOML/YAML files in /app/recipes/ and
+each defines a pool of transitions; every render samples from the pool so
+no two passes look identical.
+"""
+image = "ghcr.io/a-u-supply/kinema:latest"
+command = "--output /work/output/kinema.mp4"
+timeout_seconds = 1800
+
+[input]
+media_types = ["image", "audio"]
+min_items = 0
+max_items = 500
+allow_random_fill = true
+
+[output]
+index = "kinema-outputs"
+
+input_mode = "flag"
+input_flag = "--input"
+
+[params.image_source]
+type = "select"
+label = "Image Source"
+description = "Where do the images come from?"
+options = ["picked", "search", "random"]
+default = "picked"
+required = true
+flag = "--image-source"
+
+[params.image_query]
+type = "string"
+label = "Image Query (JSON filter)"
+description = 'JSON filter for the search index, e.g. {"output_index":"sparagmos-outputs","tags":["recipe:dream-dissolve"]}'
+default = ""
+flag = "--image-query"
+depends_on = { param = "image_source", value = "search" }
+
+[params.image_count]
+type = "int"
+label = "Image Count"
+description = "How many images to pull (search/random modes)"
+min = 3
+max = 500
+default = 120
+flag = "--image-count"
+
+[params.audio_source]
+type = "select"
+label = "Audio Source"
+options = ["random_release", "pick_release", "search", "upload"]
+default = "random_release"
+required = true
+flag = "--audio-source"
+
+[params.audio_query]
+type = "string"
+label = "Audio Query (JSON filter)"
+default = ""
+flag = "--audio-query"
+depends_on = { param = "audio_source", value = "search" }
+
+[params.release_code]
+type = "string"
+label = "Release Code"
+default = ""
+flag = "--release-code"
+depends_on = { param = "audio_source", value = "pick_release" }
+
+[params.release_track]
+type = "int"
+label = "Track Number"
+min = 1
+max = 99
+default = 1
+flag = "--release-track"
+depends_on = { param = "audio_source", value = "pick_release" }
+
+[params.recipe]
+type = "select"
+label = "Transition Recipe"
+description = "Which transition pool to sample from"
+options = ["smooth-fade", "mask-bleed", "glitch-cut", "hybrid-wash"]
+default = "hybrid-wash"
+required = true
+flag = "--recipe"
+
+[params.aspect]
+type = "select"
+label = "Aspect Ratio"
+options = ["16:9", "9:16", "1:1"]
+default = "16:9"
+flag = "--aspect"
+
+[params.sec_per_image]
+type = "float"
+label = "Seconds per Image"
+min = 0.5
+max = 4.0
+default = 1.5
+flag = "--sec-per-image"
+
+[params.title_card]
+type = "select"
+label = "Title Card"
+options = ["track_title", "custom", "none"]
+default = "track_title"
+no_flag = true
+
+[params.title]
+type = "string"
+label = "Custom Title"
+default = ""
+flag = "--title"
+depends_on = { param = "title_card", value = "custom" }

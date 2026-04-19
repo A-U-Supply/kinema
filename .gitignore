@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+.coverage
+dist/
+build/
+/work/
+*.mp4
+*.png
+*.wav
+!tests/fixtures/*.png
+!tests/fixtures/*.wav
+.DS_Store

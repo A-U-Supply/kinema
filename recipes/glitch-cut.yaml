@@ -1,0 +1,18 @@
+name: Glitch Cut
+description: >
+  Pixelizations, slices, distance fields, fade-to-grays. Hard, abrupt, or
+  noisy transitions only. Pairs well with sparagmos outputs that are
+  already corroded — the cuts feel like data dropouts, not edits.
+
+transitions:
+  - type: glitch
+    weight: 3.0
+    params:
+      mode: random
+      duration: 0.35
+  # An occasional clean cut keeps the rhythm punchy.
+  - type: xfade
+    weight: 1.0
+    params:
+      mode: fadeblack
+      duration: 0.2

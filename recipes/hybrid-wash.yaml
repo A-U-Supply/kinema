@@ -1,0 +1,23 @@
+name: Hybrid Wash
+description: >
+  A heterogeneous pool — soft xfades, masked reveals, and the occasional
+  motion-compensated tween. Designed as the default "interesting" recipe:
+  the eye never quite settles into expecting the next cut.
+
+transitions:
+  - type: xfade
+    weight: 3.0
+    params:
+      mode: random
+      duration: 0.5
+  - type: mask
+    weight: 2.0
+    params:
+      mode: random
+      duration: 0.6
+  - type: tween
+    weight: 1.0
+    params:
+      duration: 0.6
+      fps: 30
+      base: fade
