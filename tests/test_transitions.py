@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from kinema.pipeline import Recipe, _build_filter_graph, _check_inputs
+from kinema.pipeline import Recipe, _check_inputs
 from kinema.transitions import (
     BUILDERS,
     MASK_MODES,
@@ -107,20 +107,3 @@ def test_check_inputs_accepts_normal_durations() -> None:
     _check_inputs(sec_per_image=1.5, transition_seconds=0.5)  # no raise
 
 
-def test_build_filter_graph_has_correct_offsets_and_labels() -> None:
-    recipe = Recipe.load(REPO_ROOT / "recipes" / "smooth-fade.yaml")
-    rng = random.Random(0)
-    graph, final = _build_filter_graph(
-        n_images=4, width=320, height=180, sec_per_image=1.0, recipe=recipe, rng=rng
-    )
-    assert final == "vout"
-    # Three transitions for four images; each xfade should have a monotonically
-    # increasing offset of 0.5, 1.0, 1.5 (sec_per_image=1.0, duration=0.5 →
-    # offset_i = (i+1)*(D-T) = (i+1)*0.5).
-    assert "offset=0.500" in graph
-    assert "offset=1.000" in graph
-    assert "offset=1.500" in graph
-    assert "[vout]" in graph
-    # Each input was normalized.
-    for i in range(4):
-        assert f"[v{i}]" in graph

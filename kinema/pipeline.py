@@ -1,19 +1,20 @@
 """Render orchestrator.
 
-Given a recipe, image paths, audio path, and target aspect/duration, build an
-ffmpeg command that:
-  1. ingests each image as a still video segment of length D
-  2. chains xfade transitions sampled from the recipe's pool, with each
-     transition's `offset` accumulating along the timeline
-  3. muxes the audio, trimming to the shorter of audio/video
-  4. encodes to H.264 + AAC mp4
+Pairwise pipeline:
+  1. Render each input image as a still mp4 clip of length D
+  2. Walk the clips, xfading each into a growing "accumulator" mp4
+  3. Mux audio with -shortest
+
+Each ffmpeg invocation has at most 2 video inputs, so memory is bounded
+no matter how many images the user provides. Slower than a single-shot
+filter_complex (lots of re-encodes), but reliable inside the worker's
+4GB / 2-CPU envelope.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import math
 import random
 import shutil
 import subprocess
@@ -23,7 +24,7 @@ from pathlib import Path
 import yaml
 
 from kinema.titles import ASPECT_DIMS, render_title_card
-from kinema.transitions import sample_transition
+from kinema.transitions import TransitionSpec, sample_transition
 
 logger = logging.getLogger(__name__)
 
@@ -52,57 +53,72 @@ def _ffprobe_duration(path: Path) -> float:
     return float(json.loads(out)["format"]["duration"])
 
 
-# Hard cap to keep the filter_complex graph + decoder allocations within the
-# worker's 4GB / 2-CPU envelope. Real-world: 12 inputs at 1920x1080 succeeds,
-# 15 inputs OOM-killed ffmpeg silently. v1 will pre-render clips and chain
-# pairwise so this cap can go away.
-_MAX_IMAGES_IN_GRAPH = 10
-
-
 def _check_inputs(sec_per_image: float, transition_seconds: float) -> None:
     if sec_per_image <= transition_seconds:
         raise ValueError("sec_per_image must exceed transition duration")
 
 
-def _build_filter_graph(
-    n_images: int,
-    width: int,
-    height: int,
-    sec_per_image: float,
-    recipe: Recipe,
-    rng: random.Random,
-) -> tuple[str, str]:
-    """Returns (filter_complex_str, final_label)."""
-    parts = []
-    # Normalize each input to consistent format/size/sar/fps.
-    for i in range(n_images):
-        parts.append(
-            f"[{i}:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
-            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
-            f"setsar=1,format=yuv420p,fps=30[v{i}]"
+def _run_ffmpeg(cmd: list[str], *, label: str) -> None:
+    """Run ffmpeg, surface stderr tail on failure (worker log_tail loses scroll)."""
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        tail = "\n".join((proc.stderr or "").splitlines()[-30:])
+        raise RuntimeError(
+            f"ffmpeg {label} failed (exit {proc.returncode})\n"
+            f"cmd: {' '.join(cmd)}\n"
+            f"stderr (tail): {tail}"
         )
 
-    # Chain xfades. After fading v0+v1 the result is "x1"; then x1+v2 → "x2"; etc.
-    prev_label = "v0"
-    cumulative_offset = 0.0
-    for i in range(n_images - 1):
-        spec = sample_transition(recipe.transitions, rng)
-        # Each segment plays for sec_per_image; transitions overlap by spec.duration.
-        # offset_i = (i+1) * (sec_per_image - spec.duration)
-        cumulative_offset += sec_per_image - spec.duration
-        next_label = f"x{i+1}" if i < n_images - 2 else "vout"
-        snippet = spec.filter_str(prev_label, f"v{i+1}", cumulative_offset)
-        parts.append(f"{snippet}[{next_label}]")
-        prev_label = next_label
 
-    # Edge case: only 2 images → final label is vout from the single xfade above.
-    # Edge case: only 1 image → no transition; alias v0 → vout.
-    if n_images == 1:
-        # `null` is the pass-through video filter; `copy` is for stream copy
-        # outside of filter graphs and crashes here.
-        parts.append("[v0]null[vout]")
+def _render_still_clip(image: Path, duration: float, width: int, height: int, out: Path) -> None:
+    """Image → fixed-length .mp4 with normalized aspect/fps/format."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    vf = (
+        f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
+        f"setsar=1,format=yuv420p,fps=30"
+    )
+    cmd = [
+        "ffmpeg", "-y", "-loglevel", "error",
+        "-loop", "1", "-t", f"{duration:.3f}", "-i", str(image),
+        "-vf", vf,
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+        "-pix_fmt", "yuv420p",
+        str(out),
+    ]
+    _run_ffmpeg(cmd, label=f"still_clip {image.name}")
 
-    return ";".join(parts), "vout"
+
+def _xfade_pair(
+    accum: Path, clip: Path, spec: TransitionSpec, offset: float, out: Path,
+) -> None:
+    """xfade `clip` onto the tail of `accum`. offset = accum_duration - spec.duration."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    filt = spec.filter_str("0:v", "1:v", offset)
+    cmd = [
+        "ffmpeg", "-y", "-loglevel", "error",
+        "-i", str(accum), "-i", str(clip),
+        "-filter_complex", f"{filt}[vout]",
+        "-map", "[vout]",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+        "-pix_fmt", "yuv420p",
+        str(out),
+    ]
+    _run_ffmpeg(cmd, label=f"xfade {spec.name} → {out.name}")
+
+
+def _mux_audio(video: Path, audio: Path, out: Path) -> None:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "ffmpeg", "-y", "-loglevel", "error",
+        "-i", str(video), "-i", str(audio),
+        "-map", "0:v", "-map", "1:a",
+        "-c:v", "copy",
+        "-c:a", "aac", "-b:a", "192k",
+        "-shortest", "-movflags", "+faststart",
+        str(out),
+    ]
+    _run_ffmpeg(cmd, label="mux audio")
 
 
 def run_pipeline(
@@ -129,61 +145,56 @@ def run_pipeline(
     workdir = workdir or out_path.parent / ".kinema-tmp"
     workdir.mkdir(parents=True, exist_ok=True)
 
-    # Title card prepended as image 0.
     inputs: list[Path] = list(image_paths)
     if title_text:
         title_png = render_title_card(title_text, aspect, workdir / "title.png")
         inputs = [title_png, *inputs]
 
+    if len(inputs) < 2:
+        raise ValueError(f"need at least 2 images (incl. title card), got {len(inputs)}")
+
     audio_seconds = _ffprobe_duration(audio_path)
     plan_T = float((recipe.transitions[0].get("params") or {}).get("duration", 0.5))
     _check_inputs(sec_per_image, plan_T)
 
-    # Use exactly what was provided; cap for ffmpeg sanity. The user controls
-    # video length via image_count (or by picking more images). Audio is
-    # trimmed/clipped to whichever side ends first via -shortest.
-    if len(inputs) > _MAX_IMAGES_IN_GRAPH:
-        logger.warning("trimming %d images to %d to fit ffmpeg envelope",
-                       len(inputs), _MAX_IMAGES_IN_GRAPH)
-        images = inputs[:_MAX_IMAGES_IN_GRAPH]
-    else:
-        images = inputs
-    if len(images) < 2:
-        raise ValueError(f"need at least 2 images, got {len(images)}")
-
-    video_seconds = len(images) * sec_per_image - (len(images) - 1) * plan_T
     logger.info(
-        "rendering: recipe=%s images=%d → %.1fs video, %.1fs audio, aspect=%s",
-        recipe.name, len(images), video_seconds, audio_seconds, aspect,
+        "rendering: recipe=%s images=%d audio=%.1fs aspect=%s sec/image=%.2f",
+        recipe.name, len(inputs), audio_seconds, aspect, sec_per_image,
     )
 
-    cmd: list[str] = ["ffmpeg", "-y", "-loglevel", "error"]
-    for img in images:
-        cmd += ["-loop", "1", "-t", f"{sec_per_image:.3f}", "-i", str(img)]
-    cmd += ["-i", str(audio_path)]
+    # 1) Render each image as a fixed-length clip.
+    clips_dir = workdir / "clips"
+    clips: list[Path] = []
+    for i, img in enumerate(inputs):
+        clip = clips_dir / f"clip_{i:04d}.mp4"
+        _render_still_clip(img, sec_per_image, width, height, clip)
+        clips.append(clip)
+        if i % 20 == 0:
+            logger.info("clips rendered: %d/%d", i + 1, len(inputs))
 
-    filter_graph, final_label = _build_filter_graph(
-        len(images), width, height, sec_per_image, recipe, rng
-    )
+    # 2) Chain xfades pairwise — accumulator grows by (D - T) per step.
+    accum = clips[0]
+    accum_duration = sec_per_image
+    accum_dir = workdir / "accum"
+    for i in range(1, len(clips)):
+        spec = sample_transition(recipe.transitions, rng)
+        offset = max(0.0, accum_duration - spec.duration)
+        next_accum = accum_dir / f"accum_{i:04d}.mp4"
+        _xfade_pair(accum, clips[i], spec, offset, next_accum)
+        # Free space: drop the previous accumulator (clips kept for debugging).
+        if accum != clips[0]:
+            try: accum.unlink()
+            except OSError: pass
+        accum = next_accum
+        accum_duration = accum_duration + sec_per_image - spec.duration
+        if i % 10 == 0:
+            logger.info("xfades: %d/%d (accum %.1fs)", i, len(clips) - 1, accum_duration)
 
-    cmd += [
-        "-filter_complex", filter_graph,
-        "-map", f"[{final_label}]",
-        "-map", f"{len(images)}:a",
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "20",
-        "-c:a", "aac", "-b:a", "192k",
-        "-shortest", "-movflags", "+faststart",
-        str(out_path),
-    ]
+    # 3) Mux audio.
+    _mux_audio(accum, audio_path, out_path)
 
-    logger.info("ffmpeg cmd: %s", " ".join(cmd))
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0:
-        # Surface ffmpeg's last 60 lines so worker log_tail shows the real cause.
-        tail = "\n".join((proc.stderr or "").splitlines()[-60:])
-        raise RuntimeError(
-            f"ffmpeg failed with exit {proc.returncode}\n"
-            f"--- filter_complex ---\n{filter_graph}\n"
-            f"--- ffmpeg stderr (tail) ---\n{tail}"
-        )
+    # Cleanup intermediates.
+    for p in (workdir / "clips", workdir / "accum"):
+        shutil.rmtree(p, ignore_errors=True)
+
     return out_path
